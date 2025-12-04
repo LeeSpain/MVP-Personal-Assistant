@@ -1,0 +1,7 @@
+{
+  "name": "Martijn's Digital Self",
+  "description": "A personal AI dashboard acting as a central brain for chat, diary, meetings, and notifications.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
