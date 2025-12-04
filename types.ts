@@ -62,6 +62,14 @@ export interface PlannerAction {
   payload: ActionPayload;
 }
 
+// Settings Interface
+export interface Settings {
+  goals: string;
+  aiBehavior: string;
+  autoCreateMeetings: boolean;
+  requireConfirmBeforeEmail: boolean;
+}
+
 // API DTOs
 export interface ChatRequest {
   message: string;
