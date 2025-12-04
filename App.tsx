@@ -5,6 +5,7 @@ import { DiaryPanel } from './components/DiaryPanel';
 import { ChatPanel } from './components/ChatPanel';
 import { TodayPanel } from './components/TodayPanel';
 import { SettingsPanel } from './components/SettingsPanel';
+import { InsightsPanel } from './components/InsightsPanel';
 import { geminiService } from './services/geminiService';
 import { 
   ChatMessage, 
@@ -15,13 +16,16 @@ import {
   Mode,
   PlannerAction,
   ActionType,
-  Settings
+  Settings,
+  Contact,
+  ActionLogEntry
 } from './types';
 import { 
   INITIAL_DIARY, 
   INITIAL_MEETINGS, 
   INITIAL_NOTIFICATIONS,
-  INITIAL_FOCUS
+  INITIAL_FOCUS,
+  INITIAL_CONTACTS
 } from './constants';
 
 const DEFAULT_SETTINGS: Settings = {
@@ -40,15 +44,18 @@ const App: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
   const [focusItems, setFocusItems] = useState<string[]>(INITIAL_FOCUS);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [contacts, setContacts] = useState<Contact[]>(INITIAL_CONTACTS);
+  const [actionLog, setActionLog] = useState<ActionLogEntry[]>([]);
   
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
       role: 'assistant',
-      content: "Welcome back, Martijn. I'm ready to assist you in Execution mode.",
+      content: "Welcome back, Martijn. I'm ready to assist you.",
       timestamp: new Date()
     }
   ]);
@@ -83,7 +90,6 @@ const App: React.FC = () => {
 
         const savedSettings = localStorage.getItem('mvb_settings');
         if (savedSettings) {
-           // Merge with DEFAULT_SETTINGS to ensure new keys are present if local storage is old
            setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(savedSettings) });
         }
 
@@ -91,6 +97,16 @@ const App: React.FC = () => {
         if (savedChat) {
           const parsed = JSON.parse(savedChat);
           setChatMessages(parsed.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) })));
+        }
+
+        const savedContacts = localStorage.getItem('mvb_contacts');
+        if (savedContacts) {
+          setContacts(JSON.parse(savedContacts));
+        }
+
+        const savedActionLog = localStorage.getItem('mvb_action_log');
+        if (savedActionLog) {
+          setActionLog(JSON.parse(savedActionLog));
         }
 
       } catch (e) {
@@ -103,7 +119,7 @@ const App: React.FC = () => {
 
   // --- Persistence: Save on Change ---
   useEffect(() => {
-    if (!isInitialized) return; // Don't save default state over existing data before load
+    if (!isInitialized) return;
     localStorage.setItem('mvb_diary', JSON.stringify(diaryEntries));
     localStorage.setItem('mvb_meetings', JSON.stringify(meetings));
     localStorage.setItem('mvb_notifications', JSON.stringify(notifications));
@@ -111,14 +127,13 @@ const App: React.FC = () => {
     localStorage.setItem('mvb_mode', mode);
     localStorage.setItem('mvb_settings', JSON.stringify(settings));
     localStorage.setItem('mvb_chat', JSON.stringify(chatMessages));
-  }, [diaryEntries, meetings, notifications, focusItems, mode, settings, chatMessages, isInitialized]);
+    localStorage.setItem('mvb_contacts', JSON.stringify(contacts));
+    localStorage.setItem('mvb_action_log', JSON.stringify(actionLog));
+  }, [diaryEntries, meetings, notifications, focusItems, mode, settings, chatMessages, contacts, actionLog, isInitialized]);
 
   // --- Action Executors ---
-
   const executePlannerActions = (actions: PlannerAction[]) => {
     actions.forEach(action => {
-      console.log("Executing Action:", action);
-      
       switch (action.type) {
         case ActionType.CREATE_DIARY:
           handleAddDiaryEntry(
@@ -130,38 +145,67 @@ const App: React.FC = () => {
 
         case ActionType.CREATE_MEETING:
           if (!settings.autoCreateMeetings) {
-            // In a real app we might ask for confirmation here
-            console.log("Auto-create meetings is disabled in settings, but proceeding for demo.");
+            console.log("Auto-create disabled, but action received.");
           }
           const newMeeting: Meeting = {
             id: Date.now().toString() + Math.random(),
             title: action.payload.title || 'New Meeting',
             startTime: action.payload.time ? new Date(action.payload.time) : new Date(Date.now() + 3600000),
-            status: 'confirmed'
+            status: 'confirmed',
+            videoLink: action.payload.platform ? `https://mvb.digitalself.local/call/${crypto.randomUUID()}` : undefined
           };
           setMeetings(prev => [...prev, newMeeting].sort((a, b) => a.startTime.getTime() - b.startTime.getTime()));
           break;
 
-        case ActionType.ADD_NOTIFICATION:
-        case ActionType.SEND_EMAIL: 
-        case ActionType.GENERATE_VIDEO_LINK:
-          let notifMsg = action.payload.message || 'New notification';
+        case ActionType.SEND_EMAIL:
+          const { recipient, contactName, channel, subject } = action.payload;
+          const name = contactName || recipient || 'Unknown';
+          const ch = channel || 'email';
+          const sub = subject || 'no subject';
           
-          if (action.type === ActionType.SEND_EMAIL) {
-            notifMsg = `📧 Email sent to ${action.payload.recipient}: ${action.payload.subject}`;
-            if (settings.requireConfirmBeforeEmail) {
-              notifMsg = `⚠️ Draft Email created for ${action.payload.recipient} (Review required)`;
-            }
-          } else if (action.type === ActionType.GENERATE_VIDEO_LINK) {
-            notifMsg = `🎥 Video link generated (${action.payload.platform || 'meet'})`;
+          let emailMsg = `📧 Email planned to ${name} via ${ch}. Subject: "${sub}" (simulation only).`;
+          
+          if (settings.requireConfirmBeforeEmail) {
+            emailMsg = `⚠️ Draft Email created for ${name} (${ch}). Review required.`;
           }
+          
+          setNotifications(prev => [{
+            id: Date.now().toString() + Math.random(),
+            message: emailMsg,
+            createdAt: new Date()
+          }, ...prev]);
+          break;
 
-          const newNotif: Notification = {
+        case ActionType.GENERATE_VIDEO_LINK:
+          const link = `https://mvb.digitalself.local/call/${crypto.randomUUID()}`;
+          const title = action.payload.title || 'Video Call';
+          const startTime = action.payload.time ? new Date(action.payload.time) : new Date(Date.now() + 3600000);
+          
+          // Create a new meeting for this link
+          const videoMeeting: Meeting = {
+            id: Date.now().toString() + Math.random(),
+            title: title,
+            startTime: startTime,
+            status: 'pending',
+            videoLink: link
+          };
+          
+          setMeetings(prev => [...prev, videoMeeting].sort((a, b) => a.startTime.getTime() - b.startTime.getTime()));
+          
+          setNotifications(prev => [{
+            id: Date.now().toString() + Math.random(),
+            message: `🎥 Video link generated for "${title}"`,
+            createdAt: new Date()
+          }, ...prev]);
+          break;
+
+        case ActionType.ADD_NOTIFICATION:
+           const notifMsg = action.payload.message || 'New notification';
+           setNotifications(prev => [{
             id: Date.now().toString() + Math.random(),
             message: notifMsg,
             createdAt: new Date()
-          };
-          setNotifications(prev => [newNotif, ...prev]);
+          }, ...prev]);
           break;
 
         case ActionType.SET_FOCUS:
@@ -171,10 +215,20 @@ const App: React.FC = () => {
           break;
       }
     });
+
+    // Log actions to history
+    if (actions.length > 0) {
+      const logEntry: ActionLogEntry = {
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+        description: `Executed ${actions.length} action(s): ${actions.map(a => a.type).join(', ')}`,
+        actions
+      };
+      setActionLog(prev => [logEntry, ...prev]);
+    }
   };
 
   // --- Handlers ---
-
   const handleSendMessage = async (text: string) => {
     if (!text.trim()) return;
 
@@ -195,14 +249,15 @@ const App: React.FC = () => {
         content: m.content
       }));
 
-      // Inject Settings into Context
       const context = [
         `Current Mode: ${mode}`,
         `Current Date: ${new Date().toLocaleString()}`,
-        `Primary Goals: ${settings.goals || "not specified"}`,
-        `AI Behavior/Persona: ${settings.aiBehavior || "Strategic, calm, concise"}`,
-        `Auto-create meetings: ${settings.autoCreateMeetings ? "enabled" : "disabled"}`,
-        `Require confirm before email: ${settings.requireConfirmBeforeEmail ? "yes" : "no"}`
+        `Goals: ${settings.goals || 'not specified'}`,
+        `AI Behavior: ${settings.aiBehavior || 'calm, strategic, concise'}`,
+        `Auto-create meetings: ${settings.autoCreateMeetings ? 'enabled' : 'disabled'}`,
+        `Require confirmation before email: ${settings.requireConfirmBeforeEmail ? 'yes' : 'no'}`,
+        `Known contacts: ${contacts.length}`,
+        `Action log entries: ${actionLog.length}`
       ].join('\n');
 
       const response = await geminiService.sendMessage(text, context, history);
@@ -244,20 +299,40 @@ const App: React.FC = () => {
     setDiaryEntries(prev => [newEntry, ...prev]);
   };
 
+  const handleDeleteDiaryEntry = (id: string) => {
+    if (window.confirm("Delete this diary entry?")) {
+      setDiaryEntries(prev => prev.filter(e => e.id !== id));
+    }
+  };
+
   const handleModeChange = (newMode: Mode) => {
     setMode(newMode);
-    setChatMessages(prev => [...prev, {
-      id: Date.now().toString(),
-      role: 'assistant',
-      content: `Switched context to: ${newMode}.`,
-      timestamp: new Date()
-    }]);
   };
 
   const handleUpdateMeetingStatus = (id: string, status: Meeting['status']) => {
-    setMeetings(prev => prev.map(m => 
-      m.id === id ? { ...m, status } : m
-    ));
+    setMeetings(prev => prev.map(m => m.id === id ? { ...m, status } : m));
+  };
+  
+  const handleDeleteMeeting = (id: string) => {
+    if (window.confirm("Remove this meeting?")) {
+      setMeetings(prev => prev.filter(m => m.id !== id));
+    }
+  };
+
+  const handleAddFocusItem = (text: string) => {
+    setFocusItems(prev => [text, ...prev]);
+  };
+
+  const handleDeleteFocusItem = (index: number) => {
+     setFocusItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDismissNotification = (id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+  
+  const handleClearChat = () => {
+    setChatMessages([]);
   };
 
   const handleResetData = () => {
@@ -272,18 +347,22 @@ const App: React.FC = () => {
       currentMode={mode} 
       onModeChange={handleModeChange}
       onOpenSettings={() => setIsSettingsOpen(true)}
+      onOpenInsights={() => setIsInsightsOpen(true)}
     >
       
-      {/* Left Column: Diary (Hidden on mobile) */}
-      <section className="hidden lg:block lg:col-span-3 h-full min-h-0">
+      {/* Left Column: Diary */}
+      {/* Order 3 on mobile, 1 on desktop */}
+      <section className="order-3 lg:order-1 col-span-12 lg:col-span-3 h-full min-h-0">
         <DiaryPanel 
           entries={diaryEntries} 
           onAddEntry={handleAddDiaryEntry} 
+          onDeleteEntry={handleDeleteDiaryEntry}
         />
       </section>
 
-      {/* Center Column: Chat (Full width mobile, center desktop) */}
-      <section className="col-span-1 lg:col-span-6 h-full min-h-0">
+      {/* Center Column: Chat */}
+      {/* Order 1 on mobile, 2 on desktop */}
+      <section className="order-1 lg:order-2 col-span-12 lg:col-span-6 h-full min-h-0">
         <ChatPanel 
           messages={chatMessages} 
           onSendMessage={handleSendMessage}
@@ -295,23 +374,38 @@ const App: React.FC = () => {
         )}
       </section>
 
-      {/* Right Column: Today/Info (Always visible now) */}
-      <section className="col-span-1 lg:col-span-3 h-full min-h-0">
+      {/* Right Column: Today/Info */}
+      {/* Order 2 on mobile, 3 on desktop */}
+      <section className="order-2 lg:order-3 col-span-12 lg:col-span-3 h-full min-h-0">
         <TodayPanel 
           meetings={meetings} 
           notifications={notifications}
           focusItems={focusItems}
+          contacts={contacts}
           onUpdateMeetingStatus={handleUpdateMeetingStatus}
+          onAddFocusItem={handleAddFocusItem}
+          onDeleteMeeting={handleDeleteMeeting}
+          onDismissNotification={handleDismissNotification}
+          onDeleteFocusItem={handleDeleteFocusItem}
         />
       </section>
 
-      {/* Settings Modal */}
       {isSettingsOpen && (
         <SettingsPanel 
           settings={settings}
           onChange={setSettings}
           onClose={() => setIsSettingsOpen(false)}
           onReset={handleResetData}
+          onClearChat={handleClearChat}
+        />
+      )}
+
+      {isInsightsOpen && (
+        <InsightsPanel 
+          diaryEntries={diaryEntries}
+          meetings={meetings}
+          actionLog={actionLog}
+          onClose={() => setIsInsightsOpen(false)}
         />
       )}
 

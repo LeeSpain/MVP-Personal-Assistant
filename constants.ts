@@ -1,5 +1,5 @@
 
-import { DiaryEntry, Meeting, Notification } from './types';
+import { DiaryEntry, Meeting, Notification, Contact } from './types';
 
 export const INITIAL_DIARY: DiaryEntry[] = [
   {
@@ -23,7 +23,8 @@ export const INITIAL_MEETINGS: Meeting[] = [
     id: 'm1',
     title: 'Weekly Sync with Lee',
     startTime: new Date(Date.now() + 3600000),
-    status: 'confirmed'
+    status: 'confirmed',
+    videoLink: 'https://meet.google.com/abc-defg-hij'
   },
   {
     id: 'm2',
@@ -50,6 +51,21 @@ export const INITIAL_FOCUS: string[] = [
   'Complete Q3 Strategy Deck',
   'Review Design System',
   'Deep Work: 2 Hours'
+];
+
+export const INITIAL_CONTACTS: Contact[] = [
+  {
+    id: 'c1',
+    name: 'Lee',
+    primaryChannel: 'whatsapp',
+    address: '+34123456789'
+  },
+  {
+    id: 'c2',
+    name: 'Patrick',
+    primaryChannel: 'teams',
+    address: 'patrick@example.com'
+  }
 ];
 
 export const SYSTEM_INSTRUCTION = `You are a Digital Self assistant designed to help the user manage their professional and personal life.

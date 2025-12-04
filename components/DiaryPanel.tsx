@@ -1,14 +1,16 @@
+
 import React, { useState } from 'react';
 import { DiaryEntry, DiaryType } from '../types';
 
 interface DiaryPanelProps {
   entries: DiaryEntry[];
   onAddEntry: (type: DiaryType, title: string, content: string) => void;
+  onDeleteEntry: (id: string) => void;
 }
 
 type FilterType = 'All' | DiaryType;
 
-export const DiaryPanel: React.FC<DiaryPanelProps> = ({ entries, onAddEntry }) => {
+export const DiaryPanel: React.FC<DiaryPanelProps> = ({ entries, onAddEntry, onDeleteEntry }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [type, setType] = useState<DiaryType>('Reflection');
   const [content, setContent] = useState('');
@@ -69,7 +71,7 @@ export const DiaryPanel: React.FC<DiaryPanelProps> = ({ entries, onAddEntry }) =
           </div>
         ) : (
           filteredEntries.map((entry) => (
-            <div key={entry.id} className="p-4 hover:bg-slate-50 rounded-lg transition-colors group mb-2 border border-transparent hover:border-slate-100">
+            <div key={entry.id} className="p-4 hover:bg-slate-50 rounded-lg transition-colors group mb-2 border border-transparent hover:border-slate-100 relative">
               <div className="flex justify-between items-start mb-1.5">
                 <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
                   entry.type === 'Decision' ? 'bg-emerald-100 text-emerald-700' :
@@ -82,10 +84,21 @@ export const DiaryPanel: React.FC<DiaryPanelProps> = ({ entries, onAddEntry }) =
                   {entry.createdAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                 </span>
               </div>
-              <h4 className="font-medium text-slate-800 text-sm mb-1">{entry.title}</h4>
+              <h4 className="font-medium text-slate-800 text-sm mb-1 pr-6">{entry.title}</h4>
               <p className="text-xs text-slate-500 line-clamp-3 leading-relaxed">
                 {entry.content}
               </p>
+              
+              {/* Delete Button (Visible on Hover) */}
+              <button 
+                onClick={(e) => { e.stopPropagation(); onDeleteEntry(entry.id); }}
+                className="absolute top-3 right-3 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all p-1"
+                title="Delete Entry"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                  <path fillRule="evenodd" d="M16.5 4.478v.227a48.816 48.816 0 013.878.512.75.75 0 11-.49 1.478l-.56 12.553A3.75 3.75 0 0115.58 23h-7.16a3.75 3.75 0 01-3.744-3.752L4.09 6.695a48.774 48.774 0 01-3.473-.512.75.75 0 01-.49-1.478 48.856 48.856 0 013.878-.512h.227c.074-1.332.618-2.614 1.503-3.558a.75.75 0 011.134.975c-.53.565-.89 1.341-.99 2.227h5.886c-.1-.886-.46-1.662-.99-2.227a.75.75 0 011.134-.975c.885.944 1.43 2.226 1.503 3.558h.227zM7.5 6.75l.48 9.6a.75.75 0 001.498-.076l-.48-9.6a.75.75 0 00-1.498.076zm5.25.75a.75.75 0 00-1.5 0v8.25a.75.75 0 001.5 0v-8.25zm2.752-.674a.75.75 0 00-1.498.076l.48 9.6a.75.75 0 001.498-.076l-.48-9.6z" clipRule="evenodd" />
+                </svg>
+              </button>
             </div>
           ))
         )}

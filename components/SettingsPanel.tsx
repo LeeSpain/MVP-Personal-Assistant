@@ -7,9 +7,10 @@ interface SettingsPanelProps {
   onChange: (settings: Settings) => void;
   onClose: () => void;
   onReset: () => void;
+  onClearChat: () => void;
 }
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onChange, onClose, onReset }) => {
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onChange, onClose, onReset, onClearChat }) => {
   const handleChange = (key: keyof Settings, value: any) => {
     onChange({
       ...settings,
@@ -101,14 +102,27 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onChange
           {/* Danger Zone */}
           <div className="pt-4 mt-4 border-t border-red-100">
             <h3 className="text-xs font-bold text-red-500 uppercase tracking-wider mb-3">Danger Zone</h3>
-            <div className="flex justify-between items-center bg-red-50 p-3 rounded-lg border border-red-100">
-              <span className="text-sm text-red-700">Clear all data & reset</span>
-              <button 
-                onClick={onReset}
-                className="px-3 py-1.5 bg-white border border-red-200 text-red-600 text-xs font-medium rounded hover:bg-red-50 transition-colors shadow-sm"
-              >
-                Reset App
-              </button>
+            
+            <div className="space-y-3">
+              <div className="flex justify-between items-center bg-red-50 p-3 rounded-lg border border-red-100">
+                <span className="text-sm text-red-700">Clear chat history</span>
+                <button 
+                  onClick={onClearChat}
+                  className="px-3 py-1.5 bg-white border border-red-200 text-red-600 text-xs font-medium rounded hover:bg-red-50 transition-colors shadow-sm"
+                >
+                  Clear Chat
+                </button>
+              </div>
+
+              <div className="flex justify-between items-center bg-red-50 p-3 rounded-lg border border-red-100">
+                <span className="text-sm text-red-700">Reset all data</span>
+                <button 
+                  onClick={onReset}
+                  className="px-3 py-1.5 bg-white border border-red-200 text-red-600 text-xs font-medium rounded hover:bg-red-50 transition-colors shadow-sm"
+                >
+                  Reset App
+                </button>
+              </div>
             </div>
           </div>
 

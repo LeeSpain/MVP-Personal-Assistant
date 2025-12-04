@@ -43,10 +43,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage })
             .map((result) => result.transcript)
             .join('');
           
-          // We set the input directly. In a more complex app, we might want to append 
-          // to existing text, but replacing/filling is standard for dictation mode.
-          // To allow appending: setInput(prev => prev + ' ' + transcript) - but handling interim duplicates is tricky.
-          // Simple approach: Input becomes the transcript during dictation.
           setInput(transcript);
         };
 
@@ -84,6 +80,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage })
     setInput('');
   };
 
+  // Helper to render bold text
+  const renderContent = (text: string) => {
+    // Split by **bold** markers
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={index} className="font-semibold text-inherit">{part.slice(2, -2)}</strong>;
+      }
+      return <span key={index}>{part}</span>;
+    });
+  };
+
   return (
     <div className="h-full flex flex-col bg-white rounded-xl border border-slate-200 shadow-lg shadow-slate-200/50 relative overflow-hidden">
       {/* Chat Area */}
@@ -105,7 +113,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage })
                   : 'bg-slate-100 text-slate-800 border border-slate-200 rounded-bl-none'
               }`}
             >
-              <div className="whitespace-pre-wrap">{msg.content}</div>
+              <div className="whitespace-pre-wrap">{renderContent(msg.content)}</div>
               <div className={`text-[10px] mt-1 opacity-70 ${msg.role === 'user' ? 'text-slate-300' : 'text-slate-500'}`}>
                 {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </div>

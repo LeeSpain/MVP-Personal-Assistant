@@ -6,48 +6,48 @@ export interface GenAIResponse {
   actions?: PlannerAction[];
 }
 
-class GeminiService {
+export async function sendMessage(
+  message: string, 
+  context: string,
+  history: { role: 'user' | 'assistant'; content: string }[] = []
+): Promise<GenAIResponse> {
   
-  async sendMessage(
-    message: string, 
-    context: string,
-    history: { role: 'user' | 'assistant'; content: string }[] = []
-  ): Promise<GenAIResponse> {
-    
-    try {
-      const payload: ChatRequest = {
-        message,
-        context,
-        history
-      };
+  try {
+    const payload: ChatRequest = {
+      message,
+      context,
+      history
+    };
 
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
+    const res = await fetch('/api/ai/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
 
-      if (!res.ok) {
-        throw new Error(`API Error: ${res.statusText}`);
-      }
-
-      const data: ChatResponse = await res.json();
-
-      return {
-        text: data.reply,
-        actions: data.actions
-      };
-
-    } catch (error) {
-      console.error("Gemini Service Error:", error);
-      return {
-        text: "I'm having trouble reaching the server right now. Please try again.",
-        actions: []
-      };
+    if (!res.ok) {
+      throw new Error(`API Error: ${res.statusText}`);
     }
+
+    const data: ChatResponse = await res.json();
+
+    return {
+      text: data.reply,
+      actions: data.actions
+    };
+
+  } catch (error) {
+    console.error("Gemini Service Error:", error);
+    return {
+      text: "I'm having trouble reaching the server right now. Please try again.",
+      actions: []
+    };
   }
 }
 
-export const geminiService = new GeminiService();
+// Export object for backward compatibility with App.tsx
+export const geminiService = {
+  sendMessage
+};

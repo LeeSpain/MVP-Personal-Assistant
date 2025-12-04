@@ -23,6 +23,7 @@ export interface Meeting {
   title: string;
   startTime: Date;
   status: 'pending' | 'confirmed' | 'cancelled';
+  videoLink?: string; // New field
 }
 
 export interface Notification {
@@ -42,24 +43,46 @@ export enum ActionType {
   GENERATE_VIDEO_LINK = 'GENERATE_VIDEO_LINK'
 }
 
+export type Channel = 'email' | 'whatsapp' | 'teams' | 'slack';
+
+export interface Contact {
+  id: string;
+  name: string;
+  primaryChannel: Channel;
+  address: string;
+}
+
 export interface ActionPayload {
   title?: string;
   content?: string;
-  time?: string;
+  time?: string; // Used as startTime
   attendees?: string[];
   message?: string;
   focusText?: string;
   tag?: 'info' | 'alert' | 'success';
   diaryType?: DiaryType;
+  
+  // Email/Contact specific fields
   recipient?: string;
+  contactName?: string;
+  channel?: Channel;
+  address?: string;
   subject?: string;
   body?: string;
+  
   platform?: 'zoom' | 'meet' | 'teams';
 }
 
 export interface PlannerAction {
   type: ActionType;
   payload: ActionPayload;
+}
+
+export interface ActionLogEntry {
+  id: string;
+  timestamp: string; // ISO string
+  description: string;
+  actions: PlannerAction[];
 }
 
 // Settings Interface
