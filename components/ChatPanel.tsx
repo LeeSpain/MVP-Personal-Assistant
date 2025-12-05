@@ -99,15 +99,23 @@ export default function ChatPanel({
           onSubmit={handleSubmit}
           className="mt-auto flex items-center gap-2 border-t border-slate-800 pt-3"
         >
-          {voiceInputEnabled && hasRecognitionSupport && (
+          {hasRecognitionSupport && (
             <button
               type="button"
-              onClick={handleMicClick}
-              className={`p-2 rounded-full transition-all ${isListening
-                ? "bg-red-500/20 text-red-400 animate-pulse ring-1 ring-red-500"
-                : "bg-slate-800 text-slate-400 hover:text-slate-200"
+              onClick={voiceInputEnabled ? handleMicClick : undefined}
+              className={`p-2 rounded-full transition-all ${!voiceInputEnabled
+                  ? "bg-slate-800/50 text-slate-600 cursor-not-allowed"
+                  : isListening
+                    ? "bg-red-500/20 text-red-400 animate-pulse ring-1 ring-red-500"
+                    : "bg-slate-800 text-slate-400 hover:text-slate-200"
                 }`}
-              title={isListening ? "Stop Listening" : "Start Listening"}
+              title={
+                !voiceInputEnabled
+                  ? "Enable voice input in Settings"
+                  : isListening
+                    ? "Stop Listening"
+                    : "Start Listening"
+              }
             >
               🎤
             </button>

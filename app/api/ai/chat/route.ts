@@ -29,6 +29,9 @@ export async function POST(req: NextRequest) {
 - **Contacts**: ${JSON.stringify(context.recentContacts)}
 - **User Goals**: ${context.goals}
 - **AI Behavior**: ${context.aiBehavior}
+- **User Profile**: ${JSON.stringify(context.userProfile)}
+- **Memories**: ${JSON.stringify(context.memories)}
+- **Daily Summary**: ${context.dailySummary || "None yet"}
       `;
     } else {
       contextString = `Context: ${context}`;

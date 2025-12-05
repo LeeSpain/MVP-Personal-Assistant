@@ -12,6 +12,7 @@ import { CommandPalette } from './components/CommandPalette';
 import { MobileNav, MobileTab } from './components/MobileNav';
 import { geminiService, sendMessage } from './services/geminiService';
 import { useTextToSpeech } from './hooks/useTextToSpeech';
+import { useMemorySummarizer } from './hooks/useMemorySummarizer';
 import {
   ChatMessage,
   DiaryEntry,
@@ -93,6 +94,10 @@ const App: React.FC = () => {
   // Voice Output
   const { speak } = useTextToSpeech();
 
+  // Memory Summarizer
+  const { generateSummary, isSummarizing } = useMemorySummarizer();
+  const [dailySummary, setDailySummary] = useState<string | null>(null);
+
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
@@ -159,6 +164,9 @@ const App: React.FC = () => {
           setActionLog(JSON.parse(savedActionLog));
         }
 
+        const savedSummary = localStorage.getItem('mvb_daily_summary');
+        if (savedSummary) setDailySummary(savedSummary);
+
       } catch (e) {
         console.error("Failed to load state from localStorage", e);
       } finally {
@@ -181,7 +189,8 @@ const App: React.FC = () => {
     localStorage.setItem('mvb_action_log', JSON.stringify(actionLog));
     localStorage.setItem('mvb_profile', JSON.stringify(userProfile));
     localStorage.setItem('mvb_memories', JSON.stringify(memories));
-  }, [diaryEntries, meetings, notifications, focusItems, mode, settings, chatMessages, contacts, actionLog, userProfile, memories, isInitialized]);
+    if (dailySummary) localStorage.setItem('mvb_daily_summary', dailySummary);
+  }, [diaryEntries, meetings, notifications, focusItems, mode, settings, chatMessages, contacts, actionLog, userProfile, memories, dailySummary, isInitialized]);
 
   // --- Action Executors ---
   const executePlannerActions = (actions: PlannerAction[]) => {
@@ -274,6 +283,23 @@ const App: React.FC = () => {
             setFocusItems(prev => [action.payload.focusText!, ...prev.slice(0, 2)]);
           }
           break;
+
+        case ActionType.MEMORIZE:
+          const newMemory: MemoryItem = {
+            id: crypto.randomUUID(),
+            content: action.payload.memoryContent || action.payload.content || 'Untitled memory',
+            type: action.payload.memoryType || 'fact',
+            createdAt: new Date().toISOString(),
+            tags: action.payload.memoryTags || []
+          };
+          setMemories(prev => [newMemory, ...prev]);
+
+          setNotifications(prev => [{
+            id: crypto.randomUUID(),
+            message: `🧠 Memorized: "${newMemory.content.substring(0, 30)}..."`,
+            createdAt: new Date()
+          }, ...prev]);
+          break;
       }
     });
 
@@ -327,7 +353,8 @@ const App: React.FC = () => {
         recentContacts: contacts.slice(0, 10).map(c => ({ name: c.name, role: c.role, company: c.company })),
         actionLogCount: actionLog.length,
         userProfile: userProfile,
-        memories: memories.slice(0, 20) // Inject last 20 memories for context
+        memories: memories.slice(0, 20), // Inject last 20 memories for context
+        dailySummary: dailySummary // Inject the latest summary
       };
 
       // We cast to any because the sendMessage signature expects string context, 
@@ -563,6 +590,24 @@ const App: React.FC = () => {
               Processing...
             </div>
           )}
+          <button
+            onClick={async () => {
+              const summary = await generateSummary({
+                diaryEntries,
+                meetings,
+                chatHistory: chatMessages,
+                timeframe: 'day'
+              });
+              if (summary) {
+                setDailySummary(summary);
+                alert("Daily Summary Generated!");
+              }
+            }}
+            className="absolute top-4 right-4 text-xs text-slate-400 hover:text-slate-600"
+            disabled={isSummarizing}
+          >
+            {isSummarizing ? 'Summarizing...' : '🔄 Summarize Day'}
+          </button>
         </section>
 
         <section className="col-span-3 h-full min-h-0">
