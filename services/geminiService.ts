@@ -29,7 +29,8 @@ export async function sendMessage(
     });
 
     if (!res.ok) {
-      throw new Error(`API Error: ${res.statusText}`);
+      const errorText = await res.text();
+      throw new Error(`API Error: ${res.status} ${res.statusText} - ${errorText}`);
     }
 
     const data: ChatResponse = await res.json();
