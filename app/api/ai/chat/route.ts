@@ -1,212 +1,119 @@
+import { NextRequest, NextResponse } from "next/server";
+import { GoogleGenAI, Type, FunctionDeclaration } from "@google/genai";
 
-import { NextResponse } from 'next/server';
-import { GoogleGenAI, FunctionDeclaration, Type, Content } from "@google/genai";
-import { ChatRequest, ChatResponse, PlannerAction, ActionType } from '../../../../types';
-import { SYSTEM_INSTRUCTION } from '../../../../constants';
-
-// --- Tool Definitions for Gemini ---
-const toolsDef: FunctionDeclaration[] = [
-  {
-    name: 'execute_planner',
-    description: 'Executes a list of actions based on the user\'s request. Use this when the user asks to perform specific tasks like scheduling, journaling, email, or setting reminders.',
-    parameters: {
-      type: Type.OBJECT,
-      properties: {
-        actions: {
-          type: Type.ARRAY,
-          description: 'A list of actions to execute.',
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              type: {
-                type: Type.STRING,
-                enum: [
-                  ActionType.CREATE_DIARY,
-                  ActionType.CREATE_MEETING,
-                  ActionType.ADD_NOTIFICATION,
-                  ActionType.SET_FOCUS,
-                  ActionType.SEND_EMAIL,
-                  ActionType.GENERATE_VIDEO_LINK
-                ],
-                description: 'The type of action to perform.'
-              },
-              payload: {
-                type: Type.OBJECT,
-                description: 'The data required for the action.',
-                properties: {
-                  title: { type: Type.STRING },
-                  content: { type: Type.STRING },
-                  diaryType: { 
-                    type: Type.STRING, 
-                    enum: ['Reflection', 'Decision', 'Idea'],
-                    description: 'Required for CREATE_DIARY. Classifies the entry.'
-                  },
-                  time: { type: Type.STRING, description: 'ISO date string' },
-                  attendees: { type: Type.ARRAY, items: { type: Type.STRING } },
-                  message: { type: Type.STRING },
-                  focusText: { type: Type.STRING },
-                  tag: { type: Type.STRING, enum: ['info', 'alert', 'success'] },
-                  recipient: { type: Type.STRING },
-                  subject: { type: Type.STRING },
-                  body: { type: Type.STRING },
-                  platform: { type: Type.STRING, enum: ['zoom', 'meet', 'teams'] }
-                }
-              }
+const executePlannerFunction: FunctionDeclaration = {
+  name: 'execute_planner',
+  description: 'Execute actions like creating diary entries, scheduling meetings, setting focus, or sending emails.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      actions: {
+        type: Type.ARRAY,
+        description: 'List of actions to execute',
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            type: {
+              type: Type.STRING,
+              description: 'Action type: CREATE_DIARY, CREATE_MEETING, ADD_NOTIFICATION, SET_FOCUS, SEND_EMAIL, GENERATE_VIDEO_LINK'
             },
-            required: ['type', 'payload']
-          }
-        }
-      },
-      required: ['actions']
-    }
-  }
-];
-
-export async function POST(req: Request) {
-  try {
-    const body: ChatRequest = await req.json();
-    const { message, history, context } = body;
-
-    // -----------------------------------------------------------
-    // 1. REAL AI MODE (If API_KEY is present)
-    // -----------------------------------------------------------
-    if (process.env.API_KEY) {
-      try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const model = 'gemini-2.5-flash';
-
-        // 1. Prepare Content
-        // We filter out the last message from history if it matches the current message
-        // to avoid duplication, as we will append the current message with context below.
-        const cleanHistory = history.filter((msg, index) => {
-          const isLast = index === history.length - 1;
-          return !(isLast && msg.role === 'user' && msg.content === message);
-        });
-
-        const contents: Content[] = cleanHistory.map(msg => ({
-          role: msg.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: msg.content }]
-        }));
-
-        // 2. Add current message with context
-        const promptContext = context ? `System Context:\n${context}\n\n` : '';
-        contents.push({
-          role: 'user',
-          parts: [{ text: `${promptContext}User Request: ${message}` }]
-        });
-        
-        const response = await ai.models.generateContent({
-          model: model,
-          contents: contents,
-          config: {
-            systemInstruction: SYSTEM_INSTRUCTION,
-            tools: [{ functionDeclarations: toolsDef }],
-          }
-        });
-
-        let reply = response.text || "";
-        let actions: PlannerAction[] = [];
-
-        // Check for function calls using the SDK getter
-        const functionCalls = response.functionCalls;
-        if (functionCalls && functionCalls.length > 0) {
-          // Iterate over all function calls (Gemini can return multiple)
-          for (const call of functionCalls) {
-            if (call.name === 'execute_planner') {
-              const args = call.args as any;
-              if (args && args.actions) {
-                actions = [...actions, ...args.actions];
+            payload: {
+              type: Type.OBJECT,
+              description: 'Parameters for the action',
+              properties: {
+                title: { type: Type.STRING },
+                content: { type: Type.STRING },
+                message: { type: Type.STRING },
+                time: { type: Type.STRING, description: 'ISO date string' },
+                diaryType: { type: Type.STRING, description: 'Reflection, Decision, or Idea' },
+                focusText: { type: Type.STRING },
+                recipient: { type: Type.STRING },
+                subject: { type: Type.STRING },
+                contactName: { type: Type.STRING },
+                channel: { type: Type.STRING },
+                platform: { type: Type.STRING, description: 'zoom, meet, or teams' }
               }
             }
-          }
+          },
+          required: ['type', 'payload']
         }
+      }
+    },
+    required: ['actions']
+  }
+};
 
-        // Fallback reply if only actions are returned
-        if (!reply && actions.length > 0) {
-          reply = "I'm handling that for you right now.";
-        } else if (!reply) {
-          reply = "I processed your request.";
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { message, context, history } = body;
+
+    // Use Gemini API Key from environment variables
+    if (!process.env.API_KEY) {
+       return NextResponse.json(
+        { error: "Missing API_KEY environment variable" },
+        { status: 500 }
+      );
+    }
+
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+    // Map history to Gemini format (user/model)
+    let contents = [];
+    if (Array.isArray(history)) {
+      contents = history.map((h: any) => ({
+        role: h.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: h.content }]
+      }));
+    }
+    
+    // Add current message
+    contents.push({
+      role: 'user',
+      parts: [{ text: message || '' }]
+    });
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: contents,
+      config: {
+        systemInstruction: context,
+        tools: [{ functionDeclarations: [executePlannerFunction] }],
+      }
+    });
+
+    const candidate = response.candidates?.[0];
+    const modelParts = candidate?.content?.parts || [];
+    
+    let replyText = "";
+    let actions: any[] = [];
+
+    for (const part of modelParts) {
+      if (part.text) {
+        replyText += part.text;
+      }
+      if (part.functionCall) {
+        if (part.functionCall.name === 'execute_planner') {
+             const args = part.functionCall.args as any;
+             if (args && Array.isArray(args.actions)) {
+                 actions.push(...args.actions);
+             }
         }
-
-        return NextResponse.json({ reply, actions } as ChatResponse);
-
-      } catch (geminiError) {
-        console.error("Gemini API Error:", geminiError);
-        // We can either throw here or fall through to mock mode. 
-        // For a production app, we usually want to report the error.
-        return NextResponse.json(
-          { error: 'Failed to communicate with AI service', reply: '', actions: [] }, 
-          { status: 502 }
-        );
       }
     }
 
-    // -----------------------------------------------------------
-    // 2. MOCK MODE (Fallback)
-    // -----------------------------------------------------------
-    console.log("Running in Mock Mode (No API Key found)");
-    
-    let reply = "I've received your message. I'm currently operating in Mock Mode (connect an API key to activate my full brain).";
-    let actions: PlannerAction[] = [];
-    const lowerMsg = message.toLowerCase();
+    return NextResponse.json({ 
+        reply: replyText,
+        actions: actions
+    });
 
-    // Mock Intent Detection
-    if (lowerMsg.includes('meeting') || lowerMsg.includes('schedule') || lowerMsg.includes('calendar')) {
-      reply = "I can help with that. I've prepared a calendar invite for you.";
-      actions.push({
-        type: ActionType.CREATE_MEETING,
-        payload: {
-          title: 'New Meeting',
-          time: new Date(Date.now() + 86400000).toISOString(),
-          attendees: ['martijn@example.com']
-        }
-      });
-    } else if (lowerMsg.includes('diary') || lowerMsg.includes('journal') || lowerMsg.includes('note')) {
-      reply = "I've logged that into your digital diary.";
-      actions.push({
-        type: ActionType.CREATE_DIARY,
-        payload: {
-          title: 'Quick Note',
-          content: message,
-          diaryType: 'Idea'
-        }
-      });
-    } else if (lowerMsg.includes('focus')) {
-      reply = "Setting your focus now.";
-      actions.push({
-        type: ActionType.SET_FOCUS,
-        payload: {
-          focusText: message.replace('focus', '').trim() || "Deep Work"
-        }
-      });
-    } else if (lowerMsg.includes('email')) {
-      reply = "Drafting email...";
-      actions.push({
-        type: ActionType.SEND_EMAIL,
-        payload: {
-          recipient: 'test@example.com',
-          subject: 'Mock Email',
-          body: message
-        }
-      });
-    } else if (lowerMsg.includes('video') || lowerMsg.includes('zoom')) {
-      reply = "Generating video link...";
-      actions.push({
-        type: ActionType.GENERATE_VIDEO_LINK,
-        payload: {
-          platform: 'zoom'
-        }
-      });
-    } else {
-      reply = `I heard: "${message}". I can simulate creating meetings or notes if you use those keywords.`;
-    }
-
-    return NextResponse.json({ reply, actions } as ChatResponse);
-
-  } catch (error) {
-    console.error('Error in /api/ai/chat:', error);
+  } catch (err: any) {
+    console.error("Chat API error:", err);
     return NextResponse.json(
-      { error: 'Internal Server Error' }, 
+      {
+        error: "Something went wrong talking to the AI.",
+        details: err?.message ?? "Unknown error",
+      },
       { status: 500 }
     );
   }

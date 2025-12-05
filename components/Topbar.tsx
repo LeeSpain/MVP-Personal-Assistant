@@ -1,109 +1,55 @@
-import React from "react";
-import { Mode } from "../types";
+import React from 'react';
+import { Mode } from '../types';
 
 interface TopbarProps {
   currentMode: Mode;
   onModeChange: (mode: Mode) => void;
   onOpenSettings: () => void;
   onOpenInsights: () => void;
-  onOpenCommandPalette?: () => void;
+  onOpenContacts: () => void;
+  onOpenCommandPalette: () => void;
 }
 
-const MODES: Mode[] = [
-  "Deep Work",
-  "Execution",
-  "Relationship",
-  "Recovery",
-];
+const MODES: Mode[] = ['Deep Work', 'Execution', 'Relationship', 'Recovery'];
 
-export const Topbar: React.FC<TopbarProps> = ({
-  currentMode,
-  onModeChange,
-  onOpenSettings,
-  onOpenInsights,
-  onOpenCommandPalette,
+export const Topbar: React.FC<TopbarProps> = ({ 
+  currentMode, 
+  onModeChange, 
+  onOpenSettings, 
+  onOpenInsights, 
+  onOpenContacts,
+  onOpenCommandPalette 
 }) => {
   return (
-    <div className="w-full px-4 md:px-8 py-4 flex items-center justify-between">
-
-      {/* LEFT — BRAND AREA */}
-      <div className="flex flex-col">
-        <span className="text-[11px] uppercase tracking-[0.22em] text-slate-400">
-          DIGITAL SELF
-        </span>
-
-        <h1 className="text-xl lg:text-2xl font-bold text-white -mt-1">
-          Martijn&apos;s Personal OS
-        </h1>
-
-        <p className="text-xs text-slate-400 -mt-0.5">
-          One place for your thinking, decisions, and execution.
-        </p>
-      </div>
-
-      {/* CENTER — MODE SELECTOR */}
-      <div className="hidden lg:flex items-center gap-2">
-        <div className="flex items-center bg-slate-900/60 border border-slate-800 rounded-full px-1 py-1 shadow-inner">
-          {MODES.map((mode) => {
-            const active = mode === currentMode;
-            return (
-              <button
-                key={mode}
-                onClick={() => onModeChange(mode)}
-                className={[
-                  "px-4 py-1.5 text-sm rounded-full transition-all",
-                  active
-                    ? "bg-cyan-500 text-slate-900 font-medium shadow"
-                    : "text-slate-300 hover:bg-slate-800"
-                ].join(" ")}
-              >
-                {mode}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* RIGHT — ACTIONS */}
+    <header className="h-16 border-b border-slate-800 bg-slate-900/80 backdrop-blur px-4 lg:px-6 flex items-center justify-between shrink-0 z-20">
       <div className="flex items-center gap-3">
-
-        {/* 🧠 COMMAND BUTTON */}
-        {onOpenCommandPalette && (
-          <button
-            onClick={onOpenCommandPalette}
-            className="hidden lg:inline-flex items-center px-4 py-2 text-sm rounded-full bg-slate-800 text-slate-200 
-                       border border-slate-700 hover:bg-slate-700 transition"
-          >
-            Command
-          </button>
-        )}
-
-        {/* INSIGHTS */}
-        <button
-          onClick={onOpenInsights}
-          className="hidden lg:inline-flex items-center px-4 py-2 text-sm rounded-full bg-slate-800 text-slate-200 
-                     border border-slate-700 hover:bg-slate-700 transition"
-        >
-          Insights
-        </button>
-
-        {/* SETTINGS */}
-        <button
-          onClick={onOpenSettings}
-          className="hidden lg:inline-flex items-center px-4 py-2 text-sm rounded-full bg-slate-800 text-slate-200 
-                     border border-slate-700 hover:bg-slate-700 transition"
-        >
-          Settings
-        </button>
-
-        {/* AVATAR */}
-        <div className="flex items-center justify-center h-9 w-9 rounded-full bg-gradient-to-br 
-                        from-cyan-500 to-sky-400 text-slate-900 font-bold shadow-md shadow-slate-900/20 
-                        ring-2 ring-slate-900">
-          M
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center font-bold text-white text-lg">M</div>
+        <div>
+          <div className="text-sm font-semibold tracking-wide text-slate-100">Martijn’s Digital Self</div>
+          <div className="text-xs text-slate-400 hidden sm:block">Personal AI Dashboard</div>
         </div>
       </div>
 
-    </div>
+      <div className="hidden md:flex bg-slate-800 p-1 rounded-lg border border-slate-700">
+        {MODES.map((mode) => (
+          <button
+            key={mode}
+            onClick={() => onModeChange(mode)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+              currentMode === mode ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {mode}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button onClick={onOpenCommandPalette} className="hidden md:inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">Command</button>
+        <button onClick={onOpenContacts} className="hidden md:inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">Contacts</button>
+        <button onClick={onOpenInsights} className="inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">Insights</button>
+        <button onClick={onOpenSettings} className="inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">Settings</button>
+      </div>
+    </header>
   );
 };

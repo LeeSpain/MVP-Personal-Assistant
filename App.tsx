@@ -1,12 +1,14 @@
-
 import React, { useState, useEffect } from 'react';
-import { AppShell } from './components/AppShell';
-import { DiaryPanel } from './components/DiaryPanel';
-import { ChatPanel } from './components/ChatPanel';
-import { TodayPanel } from './components/TodayPanel';
-import { SettingsPanel } from './components/SettingsPanel';
-import { InsightsPanel } from './components/InsightsPanel';
-import { geminiService } from './services/geminiService';
+import AppShell from './components/AppShell';
+import DiaryPanel from './components/DiaryPanel';
+import ChatPanel from './components/ChatPanel';
+import TodayPanel from './components/TodayPanel';
+import SettingsPanel from './components/SettingsPanel';
+import InsightsPanel from './components/InsightsPanel';
+import { ContactsPanel } from './components/ContactsPanel';
+import { CommandPalette } from './components/CommandPalette';
+import { MobileNav, MobileTab } from './components/MobileNav';
+import { geminiService, sendMessage } from './services/geminiService';
 import { 
   ChatMessage, 
   DiaryEntry, 
@@ -32,7 +34,9 @@ const DEFAULT_SETTINGS: Settings = {
   goals: '',
   aiBehavior: '',
   autoCreateMeetings: false,
-  requireConfirmBeforeEmail: true
+  requireConfirmBeforeEmail: true,
+  voiceInputEnabled: true,
+  voiceOutputEnabled: false
 };
 
 const App: React.FC = () => {
@@ -49,7 +53,17 @@ const App: React.FC = () => {
   
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
+  const [isContactsOpen, setIsContactsOpen] = useState(false);
+  
+  // Command Palette State
+  const [isCommandOpen, setIsCommandOpen] = useState(false);
+  const [commandPreviewActions, setCommandPreviewActions] = useState<PlannerAction[] | null>(null);
+  const [commandPreviewReply, setCommandPreviewReply] = useState<string | null>(null);
+  const [isCommandProcessing, setIsCommandProcessing] = useState(false);
+  const [lastCommandText, setLastCommandText] = useState<string | null>(null);
+
   const [isProcessing, setIsProcessing] = useState(false);
+  const [activeMobileTab, setActiveMobileTab] = useState<MobileTab>('chat');
   
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
@@ -90,6 +104,7 @@ const App: React.FC = () => {
 
         const savedSettings = localStorage.getItem('mvb_settings');
         if (savedSettings) {
+           // Merge defaults to handle new fields like voice flags
            setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(savedSettings) });
         }
 
@@ -249,6 +264,9 @@ const App: React.FC = () => {
         content: m.content
       }));
 
+      // Enhanced Context with actual Contact details
+      const contactListStr = contacts.map(c => `- ${c.name} (${c.primaryChannel})`).join('\n');
+
       const context = [
         `Current Mode: ${mode}`,
         `Current Date: ${new Date().toLocaleString()}`,
@@ -257,7 +275,9 @@ const App: React.FC = () => {
         `Auto-create meetings: ${settings.autoCreateMeetings ? 'enabled' : 'disabled'}`,
         `Require confirmation before email: ${settings.requireConfirmBeforeEmail ? 'yes' : 'no'}`,
         `Known contacts: ${contacts.length}`,
-        `Action log entries: ${actionLog.length}`
+        `Action log entries: ${actionLog.length}`,
+        `Known Contacts:`,
+        contactListStr
       ].join('\n');
 
       const response = await geminiService.sendMessage(text, context, history);
@@ -342,54 +362,186 @@ const App: React.FC = () => {
     }
   };
 
+  const handleUpdateContacts = (updated: Contact[]) => {
+    setContacts(updated);
+  };
+
+  const handleSimulateMessageToContact = (contact: Contact) => {
+    const message = `Simulated message to ${contact.name} via ${contact.primaryChannel}.`;
+    setNotifications(prev => [
+      {
+        id: crypto.randomUUID(),
+        message,
+        createdAt: new Date(),
+      },
+      ...prev,
+    ]);
+  };
+
+  // --- Command Palette Handlers ---
+  const handleOpenCommandPalette = () => {
+    setIsCommandOpen(true);
+    setCommandPreviewActions(null);
+    setCommandPreviewReply(null);
+    setLastCommandText(null);
+  };
+
+  const handleCloseCommandPalette = () => {
+    setIsCommandOpen(false);
+    setCommandPreviewActions(null);
+    setCommandPreviewReply(null);
+    setLastCommandText(null);
+    setIsCommandProcessing(false);
+  };
+
+  const handlePlanCommand = async (commandText: string) => {
+    if (!commandText.trim()) return;
+    setIsCommandProcessing(true);
+    setCommandPreviewActions(null);
+    setCommandPreviewReply(null);
+    setLastCommandText(commandText);
+
+    // Build context similar to handleSendMessage
+    const contactListStr = contacts.map(c => `- ${c.name} (${c.primaryChannel})`).join('\n');
+    const contextLines: string[] = [];
+
+    contextLines.push(`You are Martijn's Digital Self. You are planning actions in response to a command.`);
+    contextLines.push(`Current mode: ${mode}`);
+    contextLines.push(`Goals: ${settings.goals || 'not specified'}`);
+    contextLines.push(`AI Behavior: ${settings.aiBehavior || 'calm, strategic, concise'}`);
+    contextLines.push(`Auto-create meetings: ${settings.autoCreateMeetings ? 'enabled' : 'disabled'}`);
+    contextLines.push(`Require confirmation before email: ${settings.requireConfirmBeforeEmail ? 'yes' : 'no'}`);
+    contextLines.push(`Known contacts: ${contacts.length}`);
+    contextLines.push(contactListStr);
+    contextLines.push(`Action log entries: ${actionLog.length}`);
+
+    const context = contextLines.join('\n');
+
+    try {
+      const response = await sendMessage(commandText, context, []);
+      setCommandPreviewReply(response.text);
+      setCommandPreviewActions(response.actions || []);
+    } catch (error) {
+      console.error(error);
+      setCommandPreviewReply('Sorry, something went wrong while planning this command.');
+      setCommandPreviewActions([]);
+    } finally {
+      setIsCommandProcessing(false);
+    }
+  };
+
+  const handleExecutePlannedActions = () => {
+    if (!commandPreviewActions || commandPreviewActions.length === 0) {
+      handleCloseCommandPalette();
+      return;
+    }
+    executePlannerActions(commandPreviewActions);
+    
+    // Add a notification that a command was executed
+    setNotifications(prev => [
+      {
+        id: crypto.randomUUID(),
+        message: `Executed command: ${lastCommandText || 'unnamed command'} (${commandPreviewActions.length} action(s))`,
+        createdAt: new Date(),
+      },
+      ...prev,
+    ]);
+    handleCloseCommandPalette();
+  };
+
   return (
     <AppShell 
       currentMode={mode} 
       onModeChange={handleModeChange}
       onOpenSettings={() => setIsSettingsOpen(true)}
       onOpenInsights={() => setIsInsightsOpen(true)}
+      onOpenContacts={() => setIsContactsOpen(true)}
+      onOpenCommandPalette={handleOpenCommandPalette}
+      activeMobileTab={activeMobileTab}
+      onMobileTabChange={setActiveMobileTab}
     >
       
-      {/* Left Column: Diary */}
-      {/* Order 3 on mobile, 1 on desktop */}
-      <section className="order-3 lg:order-1 col-span-12 lg:col-span-3 h-full min-h-0">
-        <DiaryPanel 
-          entries={diaryEntries} 
-          onAddEntry={handleAddDiaryEntry} 
-          onDeleteEntry={handleDeleteDiaryEntry}
-        />
-      </section>
+      {/* DESKTOP LAYOUT (Grid) */}
+      <div className="hidden lg:contents">
+        <section className="col-span-3 h-full min-h-0">
+          <DiaryPanel 
+            entries={diaryEntries} 
+            onAddEntry={handleAddDiaryEntry} 
+            onDeleteEntry={handleDeleteDiaryEntry}
+          />
+        </section>
 
-      {/* Center Column: Chat */}
-      {/* Order 1 on mobile, 2 on desktop */}
-      <section className="order-1 lg:order-2 col-span-12 lg:col-span-6 h-full min-h-0">
-        <ChatPanel 
-          messages={chatMessages} 
-          onSendMessage={handleSendMessage}
-        />
-        {isProcessing && (
-           <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-white px-3 py-1 rounded-full shadow text-xs text-indigo-500 animate-pulse z-10">
-             Processing...
-           </div>
+        <section className="col-span-6 h-full min-h-0">
+          <ChatPanel 
+            messages={chatMessages} 
+            onSendMessage={handleSendMessage}
+            voiceInputEnabled={settings.voiceInputEnabled}
+            voiceOutputEnabled={settings.voiceOutputEnabled}
+            isProcessing={isProcessing}
+          />
+          {isProcessing && (
+             <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-white px-3 py-1 rounded-full shadow text-xs text-indigo-500 animate-pulse z-10">
+               Processing...
+             </div>
+          )}
+        </section>
+
+        <section className="col-span-3 h-full min-h-0">
+          <TodayPanel 
+            meetings={meetings} 
+            notifications={notifications}
+            focusItems={focusItems}
+            contacts={contacts}
+            onUpdateMeetingStatus={handleUpdateMeetingStatus}
+            onAddFocusItem={handleAddFocusItem}
+            onDeleteMeeting={handleDeleteMeeting}
+            onDismissNotification={handleDismissNotification}
+            onDeleteFocusItem={handleDeleteFocusItem}
+          />
+        </section>
+      </div>
+
+      {/* MOBILE LAYOUT (Tabs) */}
+      <div className="lg:hidden h-full flex flex-col min-h-0">
+        {activeMobileTab === 'diary' && (
+          <DiaryPanel 
+            entries={diaryEntries} 
+            onAddEntry={handleAddDiaryEntry} 
+            onDeleteEntry={handleDeleteDiaryEntry}
+          />
         )}
-      </section>
+        {activeMobileTab === 'chat' && (
+          <div className="h-full relative">
+            <ChatPanel 
+              messages={chatMessages} 
+              onSendMessage={handleSendMessage}
+              voiceInputEnabled={settings.voiceInputEnabled}
+              voiceOutputEnabled={settings.voiceOutputEnabled}
+              isProcessing={isProcessing}
+            />
+            {isProcessing && (
+              <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-white px-3 py-1 rounded-full shadow text-xs text-indigo-500 animate-pulse z-10">
+                Processing...
+              </div>
+            )}
+          </div>
+        )}
+        {activeMobileTab === 'today' && (
+          <TodayPanel 
+            meetings={meetings} 
+            notifications={notifications}
+            focusItems={focusItems}
+            contacts={contacts}
+            onUpdateMeetingStatus={handleUpdateMeetingStatus}
+            onAddFocusItem={handleAddFocusItem}
+            onDeleteMeeting={handleDeleteMeeting}
+            onDismissNotification={handleDismissNotification}
+            onDeleteFocusItem={handleDeleteFocusItem}
+          />
+        )}
+      </div>
 
-      {/* Right Column: Today/Info */}
-      {/* Order 2 on mobile, 3 on desktop */}
-      <section className="order-2 lg:order-3 col-span-12 lg:col-span-3 h-full min-h-0">
-        <TodayPanel 
-          meetings={meetings} 
-          notifications={notifications}
-          focusItems={focusItems}
-          contacts={contacts}
-          onUpdateMeetingStatus={handleUpdateMeetingStatus}
-          onAddFocusItem={handleAddFocusItem}
-          onDeleteMeeting={handleDeleteMeeting}
-          onDismissNotification={handleDismissNotification}
-          onDeleteFocusItem={handleDeleteFocusItem}
-        />
-      </section>
-
+      {/* MODALS */}
       {isSettingsOpen && (
         <SettingsPanel 
           settings={settings}
@@ -406,6 +558,28 @@ const App: React.FC = () => {
           meetings={meetings}
           actionLog={actionLog}
           onClose={() => setIsInsightsOpen(false)}
+        />
+      )}
+
+      {isContactsOpen && (
+        <ContactsPanel
+          contacts={contacts}
+          onChange={handleUpdateContacts}
+          onClose={() => setIsContactsOpen(false)}
+          onSimulateMessage={handleSimulateMessageToContact}
+        />
+      )}
+
+      {isCommandOpen && (
+        <CommandPalette
+          isOpen={isCommandOpen}
+          isProcessing={isCommandProcessing}
+          lastCommandText={lastCommandText}
+          reply={commandPreviewReply}
+          actions={commandPreviewActions || []}
+          onPlanCommand={handlePlanCommand}
+          onExecute={handleExecutePlannedActions}
+          onClose={handleCloseCommandPalette}
         />
       )}
 
