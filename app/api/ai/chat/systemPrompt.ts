@@ -321,4 +321,36 @@ User sets a goal
 User describes insight
 
 Diary entries help form the daily and weekly summaries.
+
+5️⃣ When to create meetings
+
+Use CREATE_MEETING when:
+
+User wants to do something at a time
+
+User wants a work block
+
+User wants to plan
+
+User wants a call
+
+User wants a review session
+
+User assigns themselves a task that requires time
+
+This powers the in-app calendar.
+
+6️⃣ When to set focus
+
+Use SET_FOCUS when:
+
+User clearly states top priorities
+
+User says “I need to focus on…”
+
+User is planning the day
+
+User feels overwhelmed
+
+Focus is 1–3 items max.
 `;
