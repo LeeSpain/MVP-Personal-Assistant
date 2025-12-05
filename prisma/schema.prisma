@@ -1,0 +1,119 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  clerkId   String   @unique
+  email     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Profile
+  name             String?
+  bio              String?
+  values           String[]
+  topics           String[]
+  communicationStyle String?
+  meetingTimes     String?
+  workHours        String?
+
+  // Relations
+  meetings      Meeting[]
+  diaryEntries  DiaryEntry[]
+  chatSessions  ChatSession[]
+  contacts      Contact[]
+  notifications Notification[]
+}
+
+model Meeting {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title       String
+  description String?
+  startTime   DateTime
+  endTime     DateTime?
+  status      String   @default("pending") // pending, confirmed, cancelled
+  videoLink   String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model DiaryEntry {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type      String   // Reflection, Decision, Idea
+  title     String
+  content   String   @db.Text
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ChatSession {
+  id        String        @id @default(uuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  summary   String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  
+  messages  ChatMessage[]
+}
+
+model ChatMessage {
+  id        String      @id @default(uuid())
+  sessionId String
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  role      String      // user, assistant
+  content   String      @db.Text
+  timestamp DateTime    @default(now())
+}
+
+model Contact {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name           String
+  company        String?
+  role           String?
+  tags           String[]
+  
+  primaryChannel String?
+  email          String?
+  phone          String?
+  whatsapp       String?
+  slack          String?
+  teams          String?
+  address        String?
+  notes          String?  @db.Text
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  message   String
+  read      Boolean  @default(false)
+  
+  createdAt DateTime @default(now())
+}

@@ -9,18 +9,22 @@ export const metadata: Metadata = {
   description: "Personal Assistant Application",
 };
 
+import { ClerkProvider } from "@clerk/nextjs";
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${inter.className} bg-slate-50 text-slate-900 h-screen overflow-hidden selection:bg-indigo-100 selection:text-indigo-700`}>
-        <div id="root" className="h-full">
-          {children}
-        </div>
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en">
+        <body className={`${inter.className} bg-slate-50 text-slate-900 h-screen overflow-hidden selection:bg-indigo-100 selection:text-indigo-700`}>
+          <div id="root" className="h-full">
+            {children}
+          </div>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

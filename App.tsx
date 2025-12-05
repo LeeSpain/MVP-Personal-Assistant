@@ -16,6 +16,8 @@ import SummaryModal from './components/SummaryModal';
 import { geminiService, sendMessage } from './services/geminiService';
 import { useTextToSpeech } from './hooks/useTextToSpeech';
 import { useMemorySummarizer } from './hooks/useMemorySummarizer';
+import { useMeetings } from './hooks/useMeetings';
+import { useDiary } from './hooks/useDiary';
 import {
   ChatMessage,
   ChatSession,
@@ -68,8 +70,8 @@ const App: React.FC = () => {
     }
     return 'Execution';
   });
-  const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>(INITIAL_DIARY);
-  const [meetings, setMeetings] = useState<Meeting[]>(INITIAL_MEETINGS);
+  const { diaryEntries, addDiaryEntry, deleteDiaryEntry } = useDiary();
+  const { meetings, addMeeting, updateMeetingStatus, deleteMeeting } = useMeetings();
   const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS);
   const [focusItems, setFocusItems] = useState<string[]>(INITIAL_FOCUS);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
@@ -139,17 +141,11 @@ const App: React.FC = () => {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        const savedDiary = localStorage.getItem('mvb_diary');
-        if (savedDiary) {
-          const parsed = JSON.parse(savedDiary);
-          setDiaryEntries(parsed.map((d: any) => ({ ...d, createdAt: new Date(d.createdAt) })));
-        }
+        // Diary is now handled by useDiary hook
 
-        const savedMeetings = localStorage.getItem('mvb_meetings');
-        if (savedMeetings) {
-          const parsed = JSON.parse(savedMeetings);
-          setMeetings(parsed.map((m: any) => ({ ...m, startTime: new Date(m.startTime) })));
-        }
+
+        // Meetings are now handled by useMeetings hook
+
 
         const savedNotifs = localStorage.getItem('mvb_notifications');
         if (savedNotifs) {
@@ -245,8 +241,8 @@ const App: React.FC = () => {
   // --- Persistence: Save on Change ---
   useEffect(() => {
     if (!isInitialized) return;
-    localStorage.setItem('mvb_diary', JSON.stringify(diaryEntries));
-    localStorage.setItem('mvb_meetings', JSON.stringify(meetings));
+    // Diary persisted to DB
+    // Meetings persisted to DB
     localStorage.setItem('mvb_notifications', JSON.stringify(notifications));
     localStorage.setItem('mvb_focus', JSON.stringify(focusItems));
     localStorage.setItem('mvb_mode', mode);
@@ -311,7 +307,7 @@ const App: React.FC = () => {
 
       switch (action.type) {
         case ActionType.CREATE_DIARY:
-          handleAddDiaryEntry(
+          addDiaryEntry(
             action.payload.diaryType || 'Reflection',
             action.payload.title || 'New Entry',
             action.payload.content || action.payload.message || ''
@@ -326,14 +322,12 @@ const App: React.FC = () => {
             ? new Date(action.payload.startTime)
             : (action.payload.time ? new Date(action.payload.time) : new Date(Date.now() + 3600000));
 
-          const newMeeting: Meeting = {
-            id: crypto.randomUUID(),
+          addMeeting({
             title: action.payload.title || 'New Meeting',
             startTime: meetingStart,
             status: (action.payload.status as any) || 'confirmed',
             videoLink: action.payload.platform ? `https://mvb.digitalself.local/call/${crypto.randomUUID()}` : undefined
-          };
-          setMeetings(prev => [...prev, newMeeting].sort((a, b) => a.startTime.getTime() - b.startTime.getTime()));
+          });
           break;
 
         case ActionType.SEND_EMAIL:
@@ -363,15 +357,12 @@ const App: React.FC = () => {
             : (action.payload.time ? new Date(action.payload.time) : new Date(Date.now() + 3600000));
 
           // Create a new meeting for this link
-          const videoMeeting: Meeting = {
-            id: crypto.randomUUID(),
+          addMeeting({
             title: title,
             startTime: vStart,
             status: 'pending',
             videoLink: link
-          };
-
-          setMeetings(prev => [...prev, videoMeeting].sort((a, b) => a.startTime.getTime() - b.startTime.getTime()));
+          });
 
           setNotifications(prev => [{
             id: crypto.randomUUID(),
@@ -470,8 +461,8 @@ const App: React.FC = () => {
     if (!lastActionBatch) return;
 
     // Restore state
-    setDiaryEntries(lastActionBatch.previousState.diary);
-    setMeetings(lastActionBatch.previousState.meetings);
+    // setDiaryEntries(lastActionBatch.previousState.diary); // TODO: Implement backend undo
+    // setMeetings(lastActionBatch.previousState.meetings); // TODO: Implement backend undo
     setFocusItems(lastActionBatch.previousState.focus);
     setMode(lastActionBatch.previousState.mode);
 
@@ -498,6 +489,17 @@ const App: React.FC = () => {
     const updatedMessages = [...chatMessages, userMsg];
     setChatMessages(updatedMessages);
     setIsProcessing(true);
+
+    // Persist User Message
+    try {
+      await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, role: 'user' }),
+      });
+    } catch (e) {
+      console.error("Failed to save user message", e);
+    }
 
     try {
       // Use previous messages for history, excluding the current one we just added
@@ -541,7 +543,16 @@ const App: React.FC = () => {
       };
       setChatMessages(prev => [...prev, aiMsg]);
 
-      setChatMessages(prev => [...prev, aiMsg]);
+      // Persist AI Message
+      try {
+        await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: response.text, role: 'assistant' }),
+        });
+      } catch (e) {
+        console.error("Failed to save AI message", e);
+      }
 
       // Voice Output Trigger
       if (settings.voiceOutputEnabled) {
@@ -567,19 +578,12 @@ const App: React.FC = () => {
   };
 
   const handleAddDiaryEntry = (type: DiaryType, title: string, content: string) => {
-    const newEntry: DiaryEntry = {
-      id: Date.now().toString(),
-      type,
-      title,
-      content,
-      createdAt: new Date()
-    };
-    setDiaryEntries(prev => [newEntry, ...prev]);
+    addDiaryEntry(type, title, content);
   };
 
   const handleDeleteDiaryEntry = (id: string) => {
     if (window.confirm("Delete this diary entry?")) {
-      setDiaryEntries(prev => prev.filter(e => e.id !== id));
+      deleteDiaryEntry(id);
     }
   };
 
@@ -588,12 +592,12 @@ const App: React.FC = () => {
   };
 
   const handleUpdateMeetingStatus = (id: string, status: Meeting['status']) => {
-    setMeetings(prev => prev.map(m => m.id === id ? { ...m, status } : m));
+    updateMeetingStatus(id, status);
   };
 
   const handleDeleteMeeting = (id: string) => {
     if (window.confirm("Remove this meeting?")) {
-      setMeetings(prev => prev.filter(m => m.id !== id));
+      deleteMeeting(id);
     }
   };
 

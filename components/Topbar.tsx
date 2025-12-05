@@ -1,5 +1,6 @@
 import React from 'react';
 import { Mode } from '../types';
+import { UserButton, SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 
 interface TopbarProps {
   currentMode: Mode;
@@ -69,6 +70,19 @@ export const Topbar: React.FC<TopbarProps> = ({
         <button onClick={onOpenContacts} className="hidden md:inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">Contacts</button>
         <button onClick={onOpenInsights} className="inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">Insights</button>
         <button onClick={onOpenSettings} className="inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">Settings</button>
+
+        <div className="ml-2 pl-2 border-l border-slate-800 flex items-center">
+          <SignedIn>
+            <UserButton afterSignOutUrl="/" />
+          </SignedIn>
+          <SignedOut>
+            <SignInButton mode="modal">
+              <button className="text-xs px-3 py-1.5 rounded-md bg-violet-600 text-white hover:bg-violet-500 transition-colors">
+                Sign In
+              </button>
+            </SignInButton>
+          </SignedOut>
+        </div>
       </div>
     </header>
   );
