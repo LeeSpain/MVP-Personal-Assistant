@@ -39,10 +39,10 @@ export async function sendMessage(
       actions: data.actions
     };
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini Service Error:", error);
     return {
-      text: "I'm having trouble reaching the server right now. Please try again.",
+      text: `Error: ${error.message || "Unknown error occurred"}`,
       actions: []
     };
   }

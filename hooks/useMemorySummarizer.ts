@@ -30,7 +30,7 @@ export const useMemorySummarizer = () => {
       `;
 
             // We use a simplified context for the summarizer itself
-            const response = await geminiService.sendMessage(prompt, { mode: 'Summarizer' }, []);
+            const response = await geminiService.sendMessage(prompt, "Summarization Task", []);
             return response.text;
         } catch (error) {
             console.error("Summarization failed:", error);
