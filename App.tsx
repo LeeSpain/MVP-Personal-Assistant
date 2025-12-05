@@ -80,6 +80,7 @@ const App: React.FC = () => {
   const [memories, setMemories] = useState<MemoryItem[]>([]);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [isContactsOpen, setIsContactsOpen] = useState(false);
 
   // Command Palette State
@@ -936,13 +937,7 @@ const App: React.FC = () => {
           onSimulateMessage={handleSimulateMessageToContact}
         />
       )}
-      <ContactsPanel
-        contacts={contacts}
-        onChange={handleUpdateContacts}
-        onClose={() => setIsContactsOpen(false)}
-        onSimulateMessage={handleSimulateMessageToContact}
-      />
-      )}
+
 
       {isHistoryOpen && (
         <ChatHistoryModal
