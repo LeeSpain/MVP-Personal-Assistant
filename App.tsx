@@ -11,6 +11,7 @@ import { ContactsPanel } from './components/ContactsPanel';
 import { CommandPalette } from './components/CommandPalette';
 import { MobileNav, MobileTab } from './components/MobileNav';
 import { geminiService, sendMessage } from './services/geminiService';
+import { useTextToSpeech } from './hooks/useTextToSpeech';
 import {
   ChatMessage,
   DiaryEntry,
@@ -22,7 +23,9 @@ import {
   ActionType,
   Settings,
   Contact,
-  ActionLogEntry
+  ActionLogEntry,
+  UserProfile,
+  MemoryItem
 } from './types';
 import {
   INITIAL_DIARY,
@@ -38,7 +41,16 @@ const DEFAULT_SETTINGS: Settings = {
   autoCreateMeetings: false,
   requireConfirmBeforeEmail: true,
   voiceInputEnabled: true,
-  voiceOutputEnabled: false
+  voiceOutputEnabled: false,
+  integrations: [
+    { id: 'gcal', type: 'google_calendar', name: 'Google Calendar', icon: '📅', enabled: false, description: 'Sync meetings and events.' },
+    { id: 'gmail', type: 'gmail', name: 'Gmail', icon: '📧', enabled: false, description: 'Read and draft emails.' },
+    { id: 'slack', type: 'slack', name: 'Slack', icon: '💬', enabled: false, description: 'Send messages to channels.' },
+    { id: 'notion', type: 'notion', name: 'Notion', icon: '📝', enabled: false, description: 'Manage pages and databases.' },
+    { id: 'linear', type: 'linear', name: 'Linear', icon: '⚡', enabled: false, description: 'Track issues and projects.' },
+    { id: 'github', type: 'github', name: 'GitHub', icon: '🐙', enabled: false, description: 'View repositories and issues.' },
+    { id: 'whatsapp', type: 'whatsapp', name: 'WhatsApp', icon: '📱', enabled: false, description: 'Send messages via API.' },
+  ]
 };
 
 const App: React.FC = () => {
@@ -53,6 +65,16 @@ const App: React.FC = () => {
   const [contacts, setContacts] = useState<Contact[]>(INITIAL_CONTACTS);
   const [actionLog, setActionLog] = useState<ActionLogEntry[]>([]);
 
+  // Memory System State
+  const [userProfile, setUserProfile] = useState<UserProfile>({
+    name: 'Martijn',
+    bio: 'Founder & Entrepreneur',
+    values: [],
+    preferences: { communicationStyle: 'Direct', meetingTimes: 'Afternoons', workHours: '9-5' },
+    topics: []
+  });
+  const [memories, setMemories] = useState<MemoryItem[]>([]);
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [isContactsOpen, setIsContactsOpen] = useState(false);
@@ -65,7 +87,11 @@ const App: React.FC = () => {
   const [lastCommandText, setLastCommandText] = useState<string | null>(null);
 
   const [isProcessing, setIsProcessing] = useState(false);
+
   const [activeMobileTab, setActiveMobileTab] = useState<MobileTab>('chat');
+
+  // Voice Output
+  const { speak } = useTextToSpeech();
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
@@ -106,8 +132,15 @@ const App: React.FC = () => {
 
         const savedSettings = localStorage.getItem('mvb_settings');
         if (savedSettings) {
-          // Merge defaults to handle new fields like voice flags
-          setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(savedSettings) });
+          const parsedSettings = JSON.parse(savedSettings);
+
+          // Migration: Check if integrations is an array (new format). If not (old object format), use default.
+          if (parsedSettings.integrations && !Array.isArray(parsedSettings.integrations)) {
+            console.warn("Migrating legacy integrations settings...");
+            parsedSettings.integrations = DEFAULT_SETTINGS.integrations;
+          }
+
+          setSettings({ ...DEFAULT_SETTINGS, ...parsedSettings });
         }
 
         const savedChat = localStorage.getItem('mvb_chat');
@@ -146,7 +179,9 @@ const App: React.FC = () => {
     localStorage.setItem('mvb_chat', JSON.stringify(chatMessages));
     localStorage.setItem('mvb_contacts', JSON.stringify(contacts));
     localStorage.setItem('mvb_action_log', JSON.stringify(actionLog));
-  }, [diaryEntries, meetings, notifications, focusItems, mode, settings, chatMessages, contacts, actionLog, isInitialized]);
+    localStorage.setItem('mvb_profile', JSON.stringify(userProfile));
+    localStorage.setItem('mvb_memories', JSON.stringify(memories));
+  }, [diaryEntries, meetings, notifications, focusItems, mode, settings, chatMessages, contacts, actionLog, userProfile, memories, isInitialized]);
 
   // --- Action Executors ---
   const executePlannerActions = (actions: PlannerAction[]) => {
@@ -164,19 +199,23 @@ const App: React.FC = () => {
           if (!settings.autoCreateMeetings) {
             console.log("Auto-create disabled, but action received.");
           }
+          const meetingStart = action.payload.startTime
+            ? new Date(action.payload.startTime)
+            : (action.payload.time ? new Date(action.payload.time) : new Date(Date.now() + 3600000));
+
           const newMeeting: Meeting = {
-            id: Date.now().toString() + Math.random(),
+            id: crypto.randomUUID(),
             title: action.payload.title || 'New Meeting',
-            startTime: action.payload.time ? new Date(action.payload.time) : new Date(Date.now() + 3600000),
-            status: 'confirmed',
+            startTime: meetingStart,
+            status: (action.payload.status as any) || 'confirmed',
             videoLink: action.payload.platform ? `https://mvb.digitalself.local/call/${crypto.randomUUID()}` : undefined
           };
           setMeetings(prev => [...prev, newMeeting].sort((a, b) => a.startTime.getTime() - b.startTime.getTime()));
           break;
 
         case ActionType.SEND_EMAIL:
-          const { recipient, contactName, channel, subject } = action.payload;
-          const name = contactName || recipient || 'Unknown';
+          const { recipient, to, contactName, channel, subject } = action.payload;
+          const name = to || recipient || contactName || 'Unknown';
           const ch = channel || 'email';
           const sub = subject || 'no subject';
 
@@ -187,7 +226,7 @@ const App: React.FC = () => {
           }
 
           setNotifications(prev => [{
-            id: Date.now().toString() + Math.random(),
+            id: crypto.randomUUID(),
             message: emailMsg,
             createdAt: new Date()
           }, ...prev]);
@@ -196,13 +235,15 @@ const App: React.FC = () => {
         case ActionType.GENERATE_VIDEO_LINK:
           const link = `https://mvb.digitalself.local/call/${crypto.randomUUID()}`;
           const title = action.payload.title || 'Video Call';
-          const startTime = action.payload.time ? new Date(action.payload.time) : new Date(Date.now() + 3600000);
+          const vStart = action.payload.startTime
+            ? new Date(action.payload.startTime)
+            : (action.payload.time ? new Date(action.payload.time) : new Date(Date.now() + 3600000));
 
           // Create a new meeting for this link
           const videoMeeting: Meeting = {
-            id: Date.now().toString() + Math.random(),
+            id: crypto.randomUUID(),
             title: title,
-            startTime: startTime,
+            startTime: vStart,
             status: 'pending',
             videoLink: link
           };
@@ -210,7 +251,7 @@ const App: React.FC = () => {
           setMeetings(prev => [...prev, videoMeeting].sort((a, b) => a.startTime.getTime() - b.startTime.getTime()));
 
           setNotifications(prev => [{
-            id: Date.now().toString() + Math.random(),
+            id: crypto.randomUUID(),
             message: `🎥 Video link generated for "${title}"`,
             createdAt: new Date()
           }, ...prev]);
@@ -219,14 +260,17 @@ const App: React.FC = () => {
         case ActionType.ADD_NOTIFICATION:
           const notifMsg = action.payload.message || 'New notification';
           setNotifications(prev => [{
-            id: Date.now().toString() + Math.random(),
+            id: crypto.randomUUID(),
             message: notifMsg,
             createdAt: new Date()
           }, ...prev]);
           break;
 
         case ActionType.SET_FOCUS:
-          if (action.payload.focusText) {
+          if (action.payload.items && Array.isArray(action.payload.items)) {
+            // Replace top items with new ones
+            setFocusItems(prev => [...action.payload.items!, ...prev].slice(0, 3));
+          } else if (action.payload.focusText) {
             setFocusItems(prev => [action.payload.focusText!, ...prev.slice(0, 2)]);
           }
           break;
@@ -266,23 +310,30 @@ const App: React.FC = () => {
         content: m.content
       }));
 
-      // Enhanced Context with actual Contact details
-      const contactListStr = contacts.map(c => `- ${c.name} (${c.primaryChannel})`).join('\n');
+      // Enhanced Context with actual Data
+      // We send a JSON object now, which the API route will format for the LLM.
+      const richContext = {
+        mode,
+        date: new Date().toISOString(),
+        goals: settings.goals || 'not specified',
+        aiBehavior: settings.aiBehavior || 'calm, strategic, concise',
+        focusItems: focusItems,
+        recentDiary: diaryEntries.slice(0, 5).map(d => ({ type: d.type, title: d.title, content: d.content, date: d.createdAt })),
+        todaysMeetings: meetings.filter(m => {
+          const mDate = new Date(m.startTime);
+          const today = new Date();
+          return mDate.getDate() === today.getDate() && mDate.getMonth() === today.getMonth() && mDate.getFullYear() === today.getFullYear();
+        }).map(m => ({ title: m.title, time: m.startTime, status: m.status })),
+        recentContacts: contacts.slice(0, 10).map(c => ({ name: c.name, role: c.role, company: c.company })),
+        actionLogCount: actionLog.length,
+        userProfile: userProfile,
+        memories: memories.slice(0, 20) // Inject last 20 memories for context
+      };
 
-      const context = [
-        `Current Mode: ${mode}`,
-        `Current Date: ${new Date().toLocaleString()}`,
-        `Goals: ${settings.goals || 'not specified'}`,
-        `AI Behavior: ${settings.aiBehavior || 'calm, strategic, concise'}`,
-        `Auto-create meetings: ${settings.autoCreateMeetings ? 'enabled' : 'disabled'}`,
-        `Require confirmation before email: ${settings.requireConfirmBeforeEmail ? 'yes' : 'no'}`,
-        `Known contacts: ${contacts.length}`,
-        `Action log entries: ${actionLog.length}`,
-        `Known Contacts:`,
-        contactListStr
-      ].join('\n');
-
-      const response = await geminiService.sendMessage(text, context, history);
+      // We cast to any because the sendMessage signature expects string context, 
+      // but we updated the API to handle object. 
+      // Ideally we should update the type definition in geminiService.ts too.
+      const response = await geminiService.sendMessage(text, richContext as any, history);
 
       const aiMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -291,6 +342,13 @@ const App: React.FC = () => {
         timestamp: new Date()
       };
       setChatMessages(prev => [...prev, aiMsg]);
+
+      setChatMessages(prev => [...prev, aiMsg]);
+
+      // Voice Output Trigger
+      if (settings.voiceOutputEnabled) {
+        speak(response.text);
+      }
 
       if (response.actions && response.actions.length > 0) {
         executePlannerActions(response.actions);
@@ -419,8 +477,27 @@ const App: React.FC = () => {
 
     const context = contextLines.join('\n');
 
+    const richContext = {
+      mode,
+      date: new Date().toISOString(),
+      goals: settings.goals || 'not specified',
+      aiBehavior: settings.aiBehavior || 'calm, strategic, concise',
+      focusItems: focusItems,
+      recentDiary: diaryEntries.slice(0, 5).map(d => ({ type: d.type, title: d.title, content: d.content, date: d.createdAt })),
+      todaysMeetings: meetings.filter(m => {
+        const mDate = new Date(m.startTime);
+        const today = new Date();
+        return mDate.getDate() === today.getDate() && mDate.getMonth() === today.getMonth() && mDate.getFullYear() === today.getFullYear();
+      }).map(m => ({ title: m.title, time: m.startTime, status: m.status })),
+      recentContacts: contacts.slice(0, 10).map(c => ({ name: c.name, role: c.role, company: c.company })),
+      actionLogCount: actionLog.length,
+      userProfile: userProfile,
+      memories: memories.slice(0, 20)
+    };
+
     try {
-      const response = await sendMessage(commandText, context, []);
+      // Prepend [COMMAND_MODE] to signal the AI to be a pure planner
+      const response = await sendMessage(`[COMMAND_MODE] ${commandText}`, richContext as any, []);
       setCommandPreviewReply(response.text);
       setCommandPreviewActions(response.actions || []);
     } catch (error) {
@@ -551,6 +628,10 @@ const App: React.FC = () => {
           onClose={() => setIsSettingsOpen(false)}
           onReset={handleResetData}
           onClearChat={handleClearChat}
+          userProfile={userProfile}
+          memories={memories}
+          onUpdateProfile={setUserProfile}
+          onDeleteMemory={(id) => setMemories(prev => prev.filter(m => m.id !== id))}
         />
       )}
 

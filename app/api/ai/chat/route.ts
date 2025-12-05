@@ -1,27 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// Initialize Gemini Client
-// Note: The new @google/genai SDK might have a different initialization. 
-// Checking the docs or assuming standard pattern. 
-// If @google/genai is the new SDK, it usually works like this or similar.
-// However, the user's package.json had "@google/genai": "^1.31.0". 
-// Let's use the standard GoogleGenerativeAI from @google/generative-ai if that was intended, 
-// but since they have @google/genai, I will assume it's the newer one or similar.
-// WAIT: @google/genai is likely the Python SDK or a misnamed package? 
-// The standard Node SDK is @google/generative-ai. 
-// Let's check what was in package.json.
-// It was "@google/genai": "^1.31.0". This looks like the new "Google Gen AI SDK" for Node.
-// Let's try to use it, but fallback to a standard fetch if unsure, or use OpenAI if configured.
-// Actually, for safety and to ensure it works, I will implement a standard fetch to the Gemini API REST endpoint 
-// if the SDK usage is ambiguous, OR I will use the standard pattern if I can verify it.
-// Given I cannot browse docs easily, I will implement a robust handler that uses the API key directly via fetch 
-// to avoid SDK version mismatch issues, OR use the OpenAI compatibility layer if they want.
-//
-// Let's stick to a direct fetch to Google's API for maximum compatibility, 
-// OR use the `GoogleGenerativeAI` class if it's available from the package.
-//
-// Let's assume the user wants to use the installed package.
-// I'll write a generic handler that can be easily adapted.
+import { SYSTEM_PROMPT } from './systemPrompt';
 
 const apiKey = process.env.GEMINI_API_KEY;
 
@@ -37,16 +15,32 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { message, context, history } = body;
 
-    // Construct the prompt
-    // We'll combine context and history into a prompt for the model.
-    // This is a simplified implementation.
+    // 1. Construct the Rich Context String
+    // The frontend now sends a JSON object for context. We need to format it for the LLM.
+    let contextString = "";
+    if (typeof context === 'object') {
+      contextString = `
+**CURRENT CONTEXT:**
+- **Date**: ${new Date().toLocaleString()}
+- **Mode**: ${context.mode}
+- **Focus**: ${JSON.stringify(context.focusItems)}
+- **Recent Diary**: ${JSON.stringify(context.recentDiary)}
+- **Today's Schedule**: ${JSON.stringify(context.todaysMeetings)}
+- **Contacts**: ${JSON.stringify(context.recentContacts)}
+- **User Goals**: ${context.goals}
+- **AI Behavior**: ${context.aiBehavior}
+      `;
+    } else {
+      contextString = `Context: ${context}`;
+    }
 
-    const systemInstruction = `You are a helpful personal assistant. \n\nContext:\n${context}`;
+    // 2. Build the Full Prompt
+    const fullSystemInstruction = `${SYSTEM_PROMPT}\n\n${contextString}`;
 
     const contents = [
       {
         role: "user",
-        parts: [{ text: systemInstruction }]
+        parts: [{ text: fullSystemInstruction }]
       },
       ...history.map((msg: any) => ({
         role: msg.role === 'assistant' ? 'model' : 'user',
@@ -58,7 +52,7 @@ export async function POST(req: NextRequest) {
       }
     ];
 
-    // Direct API call to Gemini 1.5 Flash (or Pro)
+    // 3. Call Gemini API with JSON Mode
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
@@ -71,6 +65,7 @@ export async function POST(req: NextRequest) {
           generationConfig: {
             temperature: 0.7,
             maxOutputTokens: 1000,
+            responseMimeType: "application/json" // Force JSON output
           }
         })
       }
@@ -86,15 +81,28 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await response.json();
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "I couldn't generate a response.";
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    // Parse actions from the reply if possible (basic implementation)
-    // The current frontend expects { reply, actions }.
-    // For now, we'll return empty actions unless we implement parsing logic.
+    if (!rawText) {
+      throw new Error("No content generated");
+    }
+
+    // 4. Parse the JSON Response
+    let parsedResponse;
+    try {
+      parsedResponse = JSON.parse(rawText);
+    } catch (e) {
+      console.error("Failed to parse JSON response:", rawText);
+      // Fallback if model fails to return valid JSON
+      return NextResponse.json({
+        reply: rawText, // Return raw text as reply
+        actions: []
+      });
+    }
 
     return NextResponse.json({
-      reply,
-      actions: []
+      reply: parsedResponse.reply || "I processed that, but have no specific reply.",
+      actions: parsedResponse.actions || []
     });
 
   } catch (error: any) {

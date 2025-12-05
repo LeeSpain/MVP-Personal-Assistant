@@ -46,6 +46,7 @@ export enum ActionType {
   SET_FOCUS = 'SET_FOCUS',
   SEND_EMAIL = 'SEND_EMAIL',
   GENERATE_VIDEO_LINK = 'GENERATE_VIDEO_LINK',
+  MEMORIZE = 'MEMORIZE',
 }
 
 // Communication channels (for contacts + future APIs)
@@ -82,15 +83,27 @@ export interface Contact {
 export interface ActionPayload {
   title?: string;
   content?: string;
-  time?: string; // Used as startTime
+
+  // Meeting fields
+  time?: string; // Legacy
+  startTime?: string;
+  endTime?: string;
+  description?: string;
+  status?: 'pending' | 'confirmed' | 'cancelled';
+
   attendees?: string[];
   message?: string;
-  focusText?: string;
+
+  // Focus fields
+  focusText?: string; // Legacy
+  items?: string[];
+
   tag?: 'info' | 'alert' | 'success';
   diaryType?: DiaryType;
 
   // Email/Contact specific fields
-  recipient?: string;
+  recipient?: string; // Legacy
+  to?: string;
   contactName?: string;
   channel?: Channel;
   address?: string;
@@ -99,10 +112,17 @@ export interface ActionPayload {
 
   // For video / platform selection
   platform?: 'zoom' | 'meet' | 'teams';
+  linkLabel?: string;
+
+  // Memory fields
+  memoryContent?: string;
+  memoryType?: 'fact' | 'preference' | 'summary';
+  memoryTags?: string[];
 }
 
 // Planner action
 export interface PlannerAction {
+  id: string; // Unique ID for the action
   type: ActionType;
   payload: ActionPayload;
 }
@@ -123,13 +143,54 @@ export interface Settings {
   requireConfirmBeforeEmail: boolean;
   voiceInputEnabled: boolean;
   voiceOutputEnabled: boolean;
+
+  // Integrations (New Robust System)
+  integrations: IntegrationConfig[];
+}
+
+export type IntegrationType = 'google_calendar' | 'gmail' | 'slack' | 'notion' | 'linear' | 'github' | 'whatsapp' | 'custom';
+
+export interface IntegrationConfig {
+  id: string;
+  type: IntegrationType;
+  name: string;
+  enabled: boolean;
+  icon?: string; // Emoji
+  description?: string;
+
+  // Configuration fields
+  apiKey?: string;
+  webhookUrl?: string;
+  username?: string;
+  url?: string; // For custom links
+}
+
+// Memory System
+export interface UserProfile {
+  name: string;
+  bio: string;
+  values: string[];
+  preferences: {
+    communicationStyle: string;
+    meetingTimes: string;
+    workHours: string;
+  };
+  topics: string[];
+}
+
+export interface MemoryItem {
+  id: string;
+  content: string;
+  type: 'fact' | 'preference' | 'summary';
+  createdAt: string; // ISO string
+  tags: string[];
 }
 
 // API DTOs
 export interface ChatRequest {
   message: string;
   history: { role: Role; content: string }[];
-  context?: string;
+  context?: any;
 }
 
 export interface ChatResponse {

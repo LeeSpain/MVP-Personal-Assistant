@@ -1,9 +1,10 @@
-// components/ChatPanel.tsx
+
 "use client";
 
 import { FormEvent, useState, useRef, useEffect } from "react";
 import Card from "./Card";
 import { ChatMessage } from "../types";
+import { useSpeechRecognition } from "../hooks/useSpeechRecognition";
 
 interface ChatPanelProps {
   messages: ChatMessage[];
@@ -23,6 +24,23 @@ export default function ChatPanel({
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Voice Input Hook
+  const {
+    isListening,
+    transcript,
+    startListening,
+    stopListening,
+    resetTranscript,
+    hasRecognitionSupport
+  } = useSpeechRecognition();
+
+  // Sync transcript to input
+  useEffect(() => {
+    if (transcript) {
+      setInput(transcript);
+    }
+  }, [transcript]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -37,8 +55,17 @@ export default function ChatPanel({
 
     const text = input;
     setInput("");
+    resetTranscript(); // Clear voice transcript
     await onSendMessage(text);
   }
+
+  const handleMicClick = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  };
 
   return (
     <Card title="Chat">
@@ -53,8 +80,8 @@ export default function ChatPanel({
             >
               <div
                 className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${m.role === "user"
-                    ? "bg-violet-500 text-white"
-                    : "bg-slate-800 text-slate-100"
+                  ? "bg-violet-500 text-white"
+                  : "bg-slate-800 text-slate-100"
                   }`}
               >
                 {m.content}
@@ -72,17 +99,31 @@ export default function ChatPanel({
           onSubmit={handleSubmit}
           className="mt-auto flex items-center gap-2 border-t border-slate-800 pt-3"
         >
+          {voiceInputEnabled && hasRecognitionSupport && (
+            <button
+              type="button"
+              onClick={handleMicClick}
+              className={`p-2 rounded-full transition-all ${isListening
+                ? "bg-red-500/20 text-red-400 animate-pulse ring-1 ring-red-500"
+                : "bg-slate-800 text-slate-400 hover:text-slate-200"
+                }`}
+              title={isListening ? "Stop Listening" : "Start Listening"}
+            >
+              🎤
+            </button>
+          )}
+
           <input
-            className="flex-1 rounded-full bg-slate-900/80 px-3 py-2 text-sm outline-none ring-0 focus:ring-2 focus:ring-violet-500 text-slate-100 placeholder-slate-500"
-            placeholder="Ask anything or describe what you want to do…"
+            className="flex-1 rounded-full bg-slate-900/80 px-3 py-2 text-sm outline-none ring-0 focus:ring-1 focus:ring-violet-500/50 transition-all placeholder:text-slate-600 text-slate-200"
+            placeholder={isListening ? "Listening..." : "Type a message..."}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={isProcessing}
           />
           <button
             type="submit"
-            disabled={isProcessing || !input.trim()}
-            className="rounded-full bg-violet-600 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white disabled:cursor-not-allowed disabled:bg-slate-700"
+            disabled={!input.trim() || isProcessing}
+            className="rounded-full bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Send
           </button>

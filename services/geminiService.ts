@@ -7,11 +7,12 @@ export interface GenAIResponse {
 }
 
 export async function sendMessage(
-  message: string, 
-  context: string,
+  message: string,
+
+  context: any,
   history: { role: 'user' | 'assistant'; content: string }[] = []
 ): Promise<GenAIResponse> {
-  
+
   try {
     const payload: ChatRequest = {
       message,
