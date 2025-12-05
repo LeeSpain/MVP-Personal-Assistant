@@ -47,6 +47,8 @@ export enum ActionType {
   SEND_EMAIL = 'SEND_EMAIL',
   GENERATE_VIDEO_LINK = 'GENERATE_VIDEO_LINK',
   MEMORIZE = 'MEMORIZE',
+  UPDATE_PROFILE = 'UPDATE_PROFILE',
+  SET_MODE = 'SET_MODE',
 }
 
 // Communication channels (for contacts + future APIs)
@@ -114,10 +116,22 @@ export interface ActionPayload {
   platform?: 'zoom' | 'meet' | 'teams';
   linkLabel?: string;
 
-  // Memory fields
   memoryContent?: string;
   memoryType?: 'fact' | 'preference' | 'summary';
   memoryTags?: string[];
+
+  // Profile update fields
+  profileBio?: string;
+  profileValues?: string[];
+  profilePreferences?: {
+    communicationStyle?: string;
+    meetingTimes?: string;
+    workHours?: string;
+  };
+  profileTopics?: string[];
+
+  // Mode switching
+  mode?: Mode;
 }
 
 // Planner action

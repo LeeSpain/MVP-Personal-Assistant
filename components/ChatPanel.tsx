@@ -11,6 +11,7 @@ interface ChatPanelProps {
   onSendMessage: (text: string) => Promise<void>;
   voiceInputEnabled: boolean;
   voiceOutputEnabled: boolean;
+  onToggleVoiceOutput: () => void;
   isProcessing: boolean;
 }
 
@@ -19,6 +20,7 @@ export default function ChatPanel({
   onSendMessage,
   voiceInputEnabled,
   voiceOutputEnabled,
+  onToggleVoiceOutput,
   isProcessing
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
@@ -69,6 +71,16 @@ export default function ChatPanel({
 
   return (
     <Card title="Chat">
+      <div className="absolute top-4 right-4 z-10">
+        <button
+          onClick={onToggleVoiceOutput}
+          className={`text-xs p-1.5 rounded-full transition-colors ${voiceOutputEnabled ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-800 text-slate-500 hover:text-slate-300'
+            }`}
+          title={voiceOutputEnabled ? "Mute Voice Output" : "Enable Voice Output"}
+        >
+          {voiceOutputEnabled ? '🔊' : '🔇'}
+        </button>
+      </div>
       <div className="flex h-full flex-col">
         {/* Messages */}
         <div className="flex-1 overflow-y-auto pr-1 space-y-3 mb-3">
@@ -104,10 +116,10 @@ export default function ChatPanel({
               type="button"
               onClick={voiceInputEnabled ? handleMicClick : undefined}
               className={`p-2 rounded-full transition-all ${!voiceInputEnabled
-                  ? "bg-slate-800/50 text-slate-600 cursor-not-allowed"
-                  : isListening
-                    ? "bg-red-500/20 text-red-400 animate-pulse ring-1 ring-red-500"
-                    : "bg-slate-800 text-slate-400 hover:text-slate-200"
+                ? "bg-slate-800/50 text-slate-600 cursor-not-allowed"
+                : isListening
+                  ? "bg-red-500/20 text-red-400 animate-pulse ring-1 ring-red-500"
+                  : "bg-slate-800 text-slate-400 hover:text-slate-200"
                 }`}
               title={
                 !voiceInputEnabled
@@ -136,6 +148,14 @@ export default function ChatPanel({
             Send
           </button>
         </form>
+
+        {/* Context Hints */}
+        <div className="mt-2 px-2 text-[10px] text-slate-500 text-center">
+          <span className="opacity-70">Try saying: </span>
+          <span className="italic text-slate-400">
+            "{['Create a deep work block tomorrow for ICE Alarm', 'Switch me to Recovery mode', 'Plan my week based on my goals', 'Add a focus item to call John'][Math.floor(Math.random() * 4)]}"
+          </span>
+        </div>
       </div>
     </Card>
   );

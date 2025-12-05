@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
 - **User Profile**: ${JSON.stringify(context.userProfile)}
 - **Memories**: ${JSON.stringify(context.memories)}
 - **Daily Summary**: ${context.dailySummary || "None yet"}
+- **Weekly Summary**: ${context.weeklySummary || "None yet"}
       `;
     } else {
       contextString = `Context: ${context}`;

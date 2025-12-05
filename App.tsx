@@ -97,6 +97,20 @@ const App: React.FC = () => {
   // Memory Summarizer
   const { generateSummary, isSummarizing } = useMemorySummarizer();
   const [dailySummary, setDailySummary] = useState<string | null>(null);
+  const [weeklySummary, setWeeklySummary] = useState<string | null>(null);
+
+  // Undo System
+  const [lastActionBatch, setLastActionBatch] = useState<{
+    id: string;
+    description: string;
+    actions: PlannerAction[];
+    previousState: {
+      diary: DiaryEntry[];
+      meetings: Meeting[];
+      focus: string[];
+      mode: Mode;
+    };
+  } | null>(null);
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
@@ -167,6 +181,15 @@ const App: React.FC = () => {
         const savedSummary = localStorage.getItem('mvb_daily_summary');
         if (savedSummary) setDailySummary(savedSummary);
 
+        const savedWeeklySummary = localStorage.getItem('mvb_weekly_summary');
+        if (savedWeeklySummary) setWeeklySummary(savedWeeklySummary);
+
+        const savedProfile = localStorage.getItem('mvb_profile');
+        if (savedProfile) setUserProfile(JSON.parse(savedProfile));
+
+        const savedMemories = localStorage.getItem('mvb_memories');
+        if (savedMemories) setMemories(JSON.parse(savedMemories));
+
       } catch (e) {
         console.error("Failed to load state from localStorage", e);
       } finally {
@@ -190,11 +213,57 @@ const App: React.FC = () => {
     localStorage.setItem('mvb_profile', JSON.stringify(userProfile));
     localStorage.setItem('mvb_memories', JSON.stringify(memories));
     if (dailySummary) localStorage.setItem('mvb_daily_summary', dailySummary);
-  }, [diaryEntries, meetings, notifications, focusItems, mode, settings, chatMessages, contacts, actionLog, userProfile, memories, dailySummary, isInitialized]);
+    if (weeklySummary) localStorage.setItem('mvb_weekly_summary', weeklySummary);
+  }, [diaryEntries, meetings, notifications, focusItems, mode, settings, chatMessages, contacts, actionLog, userProfile, memories, dailySummary, weeklySummary, isInitialized]);
 
   // --- Action Executors ---
+  const validateAction = (action: PlannerAction): boolean => {
+    if (!action.type) return false;
+    const { payload } = action;
+
+    switch (action.type) {
+      case ActionType.CREATE_DIARY:
+        return !!(payload.content || payload.message);
+      case ActionType.CREATE_MEETING:
+        return !!payload.title;
+      case ActionType.SEND_EMAIL:
+        return !!(payload.recipient || payload.to || payload.contactName);
+      case ActionType.SET_FOCUS:
+        return !!(payload.items || payload.focusText);
+      case ActionType.MEMORIZE:
+        return !!(payload.memoryContent || payload.content);
+      case ActionType.UPDATE_PROFILE:
+        return !!(payload.profileBio || payload.profileValues || payload.profilePreferences || payload.profileTopics);
+      default:
+        return true; // Other actions might not have strict payload requirements
+    }
+  };
+
   const executePlannerActions = (actions: PlannerAction[]) => {
+    // Snapshot current state for Undo
+    const previousState = {
+      diary: [...diaryEntries],
+      meetings: [...meetings],
+      focus: [...focusItems],
+      mode: mode
+    };
+
+    let executedCount = 0;
+
     actions.forEach(action => {
+      // 1. Strict Contract Enforcement
+      if (!validateAction(action)) {
+        console.warn(`Invalid action proposed: ${action.type}`, action);
+        setNotifications(prev => [{
+          id: crypto.randomUUID(),
+          message: `⚠️ AI proposed invalid action (${action.type}). Ignored.`,
+          createdAt: new Date()
+        }, ...prev]);
+        return;
+      }
+
+      executedCount++;
+
       switch (action.type) {
         case ActionType.CREATE_DIARY:
           handleAddDiaryEntry(
@@ -300,6 +369,35 @@ const App: React.FC = () => {
             createdAt: new Date()
           }, ...prev]);
           break;
+
+        case ActionType.UPDATE_PROFILE:
+          setUserProfile(prev => ({
+            ...prev,
+            bio: action.payload.profileBio || prev.bio,
+            values: action.payload.profileValues || prev.values,
+            topics: action.payload.profileTopics || prev.topics,
+            preferences: {
+              ...prev.preferences,
+              ...(action.payload.profilePreferences || {})
+            }
+          }));
+          setNotifications(prev => [{
+            id: crypto.randomUUID(),
+            message: `👤 Profile Updated`,
+            createdAt: new Date()
+          }, ...prev]);
+          break;
+
+        case ActionType.SET_MODE:
+          if (action.payload.mode) {
+            setMode(action.payload.mode);
+            setNotifications(prev => [{
+              id: crypto.randomUUID(),
+              message: `🔄 Mode switched to ${action.payload.mode}`,
+              createdAt: new Date()
+            }, ...prev]);
+          }
+          break;
       }
     });
 
@@ -312,7 +410,33 @@ const App: React.FC = () => {
         actions
       };
       setActionLog(prev => [logEntry, ...prev]);
+
+      // Save for Undo
+      setLastActionBatch({
+        id: logEntry.id,
+        description: `Executed ${executedCount} actions`,
+        actions,
+        previousState
+      });
     }
+  };
+
+  const handleUndo = () => {
+    if (!lastActionBatch) return;
+
+    // Restore state
+    setDiaryEntries(lastActionBatch.previousState.diary);
+    setMeetings(lastActionBatch.previousState.meetings);
+    setFocusItems(lastActionBatch.previousState.focus);
+    setMode(lastActionBatch.previousState.mode);
+
+    setNotifications(prev => [{
+      id: crypto.randomUUID(),
+      message: `↩️ Undid: ${lastActionBatch.description}`,
+      createdAt: new Date()
+    }, ...prev]);
+
+    setLastActionBatch(null);
   };
 
   // --- Handlers ---
@@ -354,7 +478,8 @@ const App: React.FC = () => {
         actionLogCount: actionLog.length,
         userProfile: userProfile,
         memories: memories.slice(0, 20), // Inject last 20 memories for context
-        dailySummary: dailySummary // Inject the latest summary
+        dailySummary: dailySummary, // Inject the latest summary
+        weeklySummary: weeklySummary // Inject the weekly summary
       };
 
       // We cast to any because the sendMessage signature expects string context, 
@@ -566,6 +691,18 @@ const App: React.FC = () => {
       activeMobileTab={activeMobileTab}
       onMobileTabChange={setActiveMobileTab}
     >
+      {/* Undo Ribbon */}
+      {lastActionBatch && (
+        <div className="absolute top-0 left-0 right-0 bg-indigo-600 text-white text-xs py-1 px-4 flex justify-between items-center z-50 shadow-md">
+          <span>{lastActionBatch.description}</span>
+          <button
+            onClick={handleUndo}
+            className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors"
+          >
+            Undo
+          </button>
+        </div>
+      )}
 
       {/* DESKTOP LAYOUT (Grid) */}
       <div className="hidden lg:contents">
@@ -583,6 +720,7 @@ const App: React.FC = () => {
             onSendMessage={handleSendMessage}
             voiceInputEnabled={settings.voiceInputEnabled}
             voiceOutputEnabled={settings.voiceOutputEnabled}
+            onToggleVoiceOutput={() => setSettings(prev => ({ ...prev, voiceOutputEnabled: !prev.voiceOutputEnabled }))}
             isProcessing={isProcessing}
           />
           {isProcessing && (
@@ -590,24 +728,52 @@ const App: React.FC = () => {
               Processing...
             </div>
           )}
-          <button
-            onClick={async () => {
-              const summary = await generateSummary({
-                diaryEntries,
-                meetings,
-                chatHistory: chatMessages,
-                timeframe: 'day'
-              });
-              if (summary) {
-                setDailySummary(summary);
-                alert("Daily Summary Generated!");
-              }
-            }}
-            className="absolute top-4 right-4 text-xs text-slate-400 hover:text-slate-600"
-            disabled={isSummarizing}
-          >
-            {isSummarizing ? 'Summarizing...' : '🔄 Summarize Day'}
-          </button>
+          <div className="absolute top-4 right-4 flex gap-2">
+            <button
+              onClick={async () => {
+                const summary = await generateSummary({
+                  diaryEntries,
+                  meetings,
+                  chatHistory: chatMessages,
+                  timeframe: 'day'
+                });
+                if (summary) {
+                  setDailySummary(summary);
+                  alert("Daily Summary Generated!");
+                }
+              }}
+              className="text-xs text-slate-400 hover:text-slate-600"
+              disabled={isSummarizing}
+            >
+              {isSummarizing ? '...' : '🔄 Day'}
+            </button>
+            <button
+              onClick={async () => {
+                // Filter for last 7 days
+                const oneWeekAgo = new Date();
+                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+                const recentDiary = diaryEntries.filter(d => new Date(d.createdAt) > oneWeekAgo);
+                const recentMeetings = meetings.filter(m => new Date(m.startTime) > oneWeekAgo);
+                const recentChat = chatMessages.filter(c => new Date(c.timestamp) > oneWeekAgo);
+
+                const summary = await generateSummary({
+                  diaryEntries: recentDiary,
+                  meetings: recentMeetings,
+                  chatHistory: recentChat,
+                  timeframe: 'week'
+                });
+                if (summary) {
+                  setWeeklySummary(summary);
+                  alert("Weekly Summary Generated!");
+                }
+              }}
+              className="text-xs text-slate-400 hover:text-slate-600"
+              disabled={isSummarizing}
+            >
+              {isSummarizing ? '...' : '📅 Week'}
+            </button>
+          </div>
         </section>
 
         <section className="col-span-3 h-full min-h-0">
@@ -641,6 +807,7 @@ const App: React.FC = () => {
               onSendMessage={handleSendMessage}
               voiceInputEnabled={settings.voiceInputEnabled}
               voiceOutputEnabled={settings.voiceOutputEnabled}
+              onToggleVoiceOutput={() => setSettings(prev => ({ ...prev, voiceOutputEnabled: !prev.voiceOutputEnabled }))}
               isProcessing={isProcessing}
             />
             {isProcessing && (
@@ -685,7 +852,26 @@ const App: React.FC = () => {
           diaryEntries={diaryEntries}
           meetings={meetings}
           actionLog={actionLog}
+          chatMessages={chatMessages}
+          contacts={contacts}
           onClose={() => setIsInsightsOpen(false)}
+          onGenerateInsights={async () => {
+            const prompt = `
+               Analyze the user's recent activity and provide 3-5 actionable suggestions.
+               Focus on:
+               1. Tasks mentioned but not scheduled (Open Loops).
+               2. Contacts not recently contacted (Relationship Touches).
+               3. Imbalance between Deep Work and Execution.
+               
+               Data:
+               - Recent Diary: ${JSON.stringify(diaryEntries.slice(0, 5))}
+               - Meetings: ${JSON.stringify(meetings.slice(0, 5))}
+               - Contacts: ${JSON.stringify(contacts.slice(0, 5))}
+               - Focus Items: ${JSON.stringify(focusItems)}
+             `;
+            const response = await geminiService.sendMessage(prompt, { mode: 'Analyst' }, []);
+            return response.text;
+          }}
         />
       )}
 

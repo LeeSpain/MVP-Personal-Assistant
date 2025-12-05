@@ -1,24 +1,69 @@
-"use client";
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Card from "./Card";
 import Modal from "./Modal";
-import { DiaryEntry, Meeting, ActionLogEntry } from "../types";
+import { DiaryEntry, Meeting, ActionLogEntry, ChatMessage, Contact } from "../types";
 
 interface InsightsPanelProps {
   diaryEntries: DiaryEntry[];
   meetings: Meeting[];
   actionLog: ActionLogEntry[];
+  chatMessages: ChatMessage[];
+  contacts: Contact[];
   onClose: () => void;
+  onGenerateInsights: () => Promise<string>;
 }
 
-export default function InsightsPanel({ diaryEntries, meetings, actionLog, onClose }: InsightsPanelProps) {
+export default function InsightsPanel({
+  diaryEntries,
+  meetings,
+  actionLog,
+  chatMessages,
+  contacts,
+  onClose,
+  onGenerateInsights
+}: InsightsPanelProps) {
   const [open, setOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<string | null>(null);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
 
-  // Calculate some basic metrics
-  const totalChats = actionLog.length; // Approximate
-  const totalMeetings = meetings.length;
-  const totalEntries = diaryEntries.length;
+  // --- Real Metrics Calculation ---
+
+  // 1. Chat Sessions (Last 7 Days)
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+  const chatsThisWeek = chatMessages.filter(m => m.role === 'assistant' && new Date(m.timestamp) > oneWeekAgo).length;
+
+  // 2. Open Loops (Pending Meetings + Focus Items inferred)
+  // We don't have direct access to focusItems here, so we'll use pending meetings as a proxy for now, 
+  // or maybe just count "Idea" type diary entries.
+  const pendingMeetings = meetings.filter(m => m.status === 'pending').length;
+  const ideaEntries = diaryEntries.filter(d => d.type === 'Idea').length;
+  const openLoopsCount = pendingMeetings + ideaEntries;
+
+  // 3. Focus Balance (Deep Work vs Execution)
+  // Deep Work = Meetings > 30 mins (approx)
+  // Execution = Notifications / Short tasks
+  const deepWorkCount = meetings.length;
+  const executionCount = actionLog.length; // Actions taken
+  const focusBalance = executionCount > 0 ? Math.round((deepWorkCount / executionCount) * 10) / 10 : 0; // Ratio
+
+  // 4. Relationship Touches
+  // Count diary entries that mention contact names (simple check)
+  const relationshipTouches = contacts.reduce((acc, contact) => {
+    const mentions = diaryEntries.filter(d => d.content.includes(contact.name)).length;
+    return acc + mentions;
+  }, 0);
+
+
+  useEffect(() => {
+    if (open && !suggestions) {
+      setIsLoadingSuggestions(true);
+      onGenerateInsights()
+        .then(text => setSuggestions(text))
+        .catch(err => console.error("Failed to generate insights", err))
+        .finally(() => setIsLoadingSuggestions(false));
+    }
+  }, [open]);
 
   return (
     <>
@@ -43,13 +88,13 @@ export default function InsightsPanel({ diaryEntries, meetings, actionLog, onClo
             High-Level Summary
           </h3>
           <p className="text-sm text-slate-200">
-            You have logged {totalEntries} diary entries and scheduled {totalMeetings} meetings.
-            Your assistant has performed {totalChats} actions.
+            You have logged {diaryEntries.length} diary entries and scheduled {meetings.length} meetings.
+            Your assistant has performed {actionLog.length} actions.
           </p>
         </section>
 
         {/* Focus areas */}
-        <section>
+        <section className="mt-4">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
             Focus Areas
           </h3>
@@ -62,7 +107,7 @@ export default function InsightsPanel({ diaryEntries, meetings, actionLog, onClo
                 Projects & Strategy
               </div>
               <p className="text-[11px] text-slate-300">
-                Time spent thinking long-term, planning and designing systems.
+                {deepWorkCount} meetings scheduled.
               </p>
             </div>
             <div className="rounded-xl border border-slate-700 bg-slate-900 p-3">
@@ -73,7 +118,7 @@ export default function InsightsPanel({ diaryEntries, meetings, actionLog, onClo
                 Day-to-Day Actions
               </div>
               <p className="text-[11px] text-slate-300">
-                Tasks, follow-ups and concrete deliverables mentioned in chat.
+                {executionCount} actions executed.
               </p>
             </div>
             <div className="rounded-xl border border-slate-700 bg-slate-900 p-3">
@@ -84,64 +129,70 @@ export default function InsightsPanel({ diaryEntries, meetings, actionLog, onClo
                 People & Communication
               </div>
               <p className="text-[11px] text-slate-300">
-                Clients, partners, team and personal relationships you discuss.
+                {relationshipTouches} mentions of contacts.
               </p>
             </div>
           </div>
         </section>
 
         {/* Actionable items */}
-        <section>
+        <section className="mt-4">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
-            Suggested Follow-Ups
+            AI Suggested Follow-Ups
           </h3>
-          <ul className="space-y-2 text-xs text-slate-200">
-            <li>• Tasks you’ve mentioned but not scheduled yet</li>
-            <li>• Conversations that might need a response</li>
-            <li>• Ideas worth turning into concrete projects</li>
-          </ul>
+          <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-800">
+            {isLoadingSuggestions ? (
+              <div className="text-xs text-slate-400 animate-pulse">Analyzing your data...</div>
+            ) : suggestions ? (
+              <div className="text-xs text-slate-200 whitespace-pre-wrap leading-relaxed">
+                {suggestions}
+              </div>
+            ) : (
+              <div className="text-xs text-slate-500">No suggestions available.</div>
+            )}
+          </div>
         </section>
 
-        {/* Metrics placeholders */}
-        <section>
+        {/* Real Metrics */}
+        <section className="mt-4">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
-            Metrics (to connect with CRM later)
+            Live Metrics
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-slate-200">
             <div className="rounded-xl border border-slate-700 bg-slate-900 p-3">
               <div className="text-[11px] text-slate-400">This week</div>
-              <div className="text-lg font-semibold">{totalChats}</div>
+              <div className="text-lg font-semibold">{chatsThisWeek}</div>
               <div className="text-[11px] text-slate-400">
-                Actions logged
+                Chat sessions
               </div>
             </div>
             <div className="rounded-xl border border-slate-700 bg-slate-900 p-3">
               <div className="text-[11px] text-slate-400">Open loops</div>
-              <div className="text-lg font-semibold">—</div>
+              <div className="text-lg font-semibold">{openLoopsCount}</div>
               <div className="text-[11px] text-slate-400">
-                Items needing follow-up
+                Pending items
               </div>
             </div>
             <div className="rounded-xl border border-slate-700 bg-slate-900 p-3">
               <div className="text-[11px] text-slate-400">Focus balance</div>
-              <div className="text-lg font-semibold">—</div>
+              <div className="text-lg font-semibold">{focusBalance}</div>
               <div className="text-[11px] text-slate-400">
-                Deep work vs execution
+                Deep / Exec Ratio
               </div>
             </div>
             <div className="rounded-xl border border-slate-700 bg-slate-900 p-3">
               <div className="text-[11px] text-slate-400">
                 Relationship touches
               </div>
-              <div className="text-lg font-semibold">—</div>
+              <div className="text-lg font-semibold">{relationshipTouches}</div>
               <div className="text-[11px] text-slate-400">
-                People you interacted with
+                Contact mentions
               </div>
             </div>
           </div>
         </section>
 
-        <div className="pt-3 border-t border-slate-800 flex justify-end">
+        <div className="pt-3 border-t border-slate-800 flex justify-end mt-4">
           <button
             onClick={() => setOpen(false)}
             className="rounded-full bg-slate-800 px-4 py-1.5 text-xs font-medium text-slate-100 hover:bg-slate-700"
