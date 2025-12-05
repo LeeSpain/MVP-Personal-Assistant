@@ -3,9 +3,22 @@
 import { useState } from "react";
 import Card from "./Card";
 import Modal from "./Modal";
+import { DiaryEntry, Meeting, ActionLogEntry } from "../types";
 
-export default function InsightsPanel() {
+interface InsightsPanelProps {
+  diaryEntries: DiaryEntry[];
+  meetings: Meeting[];
+  actionLog: ActionLogEntry[];
+  onClose: () => void;
+}
+
+export default function InsightsPanel({ diaryEntries, meetings, actionLog, onClose }: InsightsPanelProps) {
   const [open, setOpen] = useState(false);
+
+  // Calculate some basic metrics
+  const totalChats = actionLog.length; // Approximate
+  const totalMeetings = meetings.length;
+  const totalEntries = diaryEntries.length;
 
   return (
     <>
@@ -30,9 +43,8 @@ export default function InsightsPanel() {
             High-Level Summary
           </h3>
           <p className="text-sm text-slate-200">
-            This area will surface a professional summary of where your focus
-            has been, what is progressing and what needs attention. For now it’s
-            static, but you can wire it to your real data later.
+            You have logged {totalEntries} diary entries and scheduled {totalMeetings} meetings.
+            Your assistant has performed {totalChats} actions.
           </p>
         </section>
 
@@ -98,9 +110,9 @@ export default function InsightsPanel() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-slate-200">
             <div className="rounded-xl border border-slate-700 bg-slate-900 p-3">
               <div className="text-[11px] text-slate-400">This week</div>
-              <div className="text-lg font-semibold">—</div>
+              <div className="text-lg font-semibold">{totalChats}</div>
               <div className="text-[11px] text-slate-400">
-                Chat sessions logged
+                Actions logged
               </div>
             </div>
             <div className="rounded-xl border border-slate-700 bg-slate-900 p-3">

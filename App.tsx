@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect } from 'react';
 import AppShell from './components/AppShell';
 import DiaryPanel from './components/DiaryPanel';
@@ -9,12 +11,12 @@ import { ContactsPanel } from './components/ContactsPanel';
 import { CommandPalette } from './components/CommandPalette';
 import { MobileNav, MobileTab } from './components/MobileNav';
 import { geminiService, sendMessage } from './services/geminiService';
-import { 
-  ChatMessage, 
-  DiaryEntry, 
-  DiaryType, 
-  Meeting, 
-  Notification, 
+import {
+  ChatMessage,
+  DiaryEntry,
+  DiaryType,
+  Meeting,
+  Notification,
   Mode,
   PlannerAction,
   ActionType,
@@ -22,9 +24,9 @@ import {
   Contact,
   ActionLogEntry
 } from './types';
-import { 
-  INITIAL_DIARY, 
-  INITIAL_MEETINGS, 
+import {
+  INITIAL_DIARY,
+  INITIAL_MEETINGS,
   INITIAL_NOTIFICATIONS,
   INITIAL_FOCUS,
   INITIAL_CONTACTS
@@ -50,11 +52,11 @@ const App: React.FC = () => {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [contacts, setContacts] = useState<Contact[]>(INITIAL_CONTACTS);
   const [actionLog, setActionLog] = useState<ActionLogEntry[]>([]);
-  
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [isContactsOpen, setIsContactsOpen] = useState(false);
-  
+
   // Command Palette State
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [commandPreviewActions, setCommandPreviewActions] = useState<PlannerAction[] | null>(null);
@@ -64,7 +66,7 @@ const App: React.FC = () => {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeMobileTab, setActiveMobileTab] = useState<MobileTab>('chat');
-  
+
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
@@ -104,8 +106,8 @@ const App: React.FC = () => {
 
         const savedSettings = localStorage.getItem('mvb_settings');
         if (savedSettings) {
-           // Merge defaults to handle new fields like voice flags
-           setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(savedSettings) });
+          // Merge defaults to handle new fields like voice flags
+          setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(savedSettings) });
         }
 
         const savedChat = localStorage.getItem('mvb_chat');
@@ -152,7 +154,7 @@ const App: React.FC = () => {
       switch (action.type) {
         case ActionType.CREATE_DIARY:
           handleAddDiaryEntry(
-            action.payload.diaryType || 'Reflection', 
+            action.payload.diaryType || 'Reflection',
             action.payload.title || 'New Entry',
             action.payload.content || action.payload.message || ''
           );
@@ -177,13 +179,13 @@ const App: React.FC = () => {
           const name = contactName || recipient || 'Unknown';
           const ch = channel || 'email';
           const sub = subject || 'no subject';
-          
+
           let emailMsg = `📧 Email planned to ${name} via ${ch}. Subject: "${sub}" (simulation only).`;
-          
+
           if (settings.requireConfirmBeforeEmail) {
             emailMsg = `⚠️ Draft Email created for ${name} (${ch}). Review required.`;
           }
-          
+
           setNotifications(prev => [{
             id: Date.now().toString() + Math.random(),
             message: emailMsg,
@@ -195,7 +197,7 @@ const App: React.FC = () => {
           const link = `https://mvb.digitalself.local/call/${crypto.randomUUID()}`;
           const title = action.payload.title || 'Video Call';
           const startTime = action.payload.time ? new Date(action.payload.time) : new Date(Date.now() + 3600000);
-          
+
           // Create a new meeting for this link
           const videoMeeting: Meeting = {
             id: Date.now().toString() + Math.random(),
@@ -204,9 +206,9 @@ const App: React.FC = () => {
             status: 'pending',
             videoLink: link
           };
-          
+
           setMeetings(prev => [...prev, videoMeeting].sort((a, b) => a.startTime.getTime() - b.startTime.getTime()));
-          
+
           setNotifications(prev => [{
             id: Date.now().toString() + Math.random(),
             message: `🎥 Video link generated for "${title}"`,
@@ -215,8 +217,8 @@ const App: React.FC = () => {
           break;
 
         case ActionType.ADD_NOTIFICATION:
-           const notifMsg = action.payload.message || 'New notification';
-           setNotifications(prev => [{
+          const notifMsg = action.payload.message || 'New notification';
+          setNotifications(prev => [{
             id: Date.now().toString() + Math.random(),
             message: notifMsg,
             createdAt: new Date()
@@ -225,7 +227,7 @@ const App: React.FC = () => {
 
         case ActionType.SET_FOCUS:
           if (action.payload.focusText) {
-             setFocusItems(prev => [action.payload.focusText!, ...prev.slice(0, 2)]);
+            setFocusItems(prev => [action.payload.focusText!, ...prev.slice(0, 2)]);
           }
           break;
       }
@@ -253,7 +255,7 @@ const App: React.FC = () => {
       content: text,
       timestamp: new Date()
     };
-    
+
     const updatedMessages = [...chatMessages, userMsg];
     setChatMessages(updatedMessages);
     setIsProcessing(true);
@@ -332,7 +334,7 @@ const App: React.FC = () => {
   const handleUpdateMeetingStatus = (id: string, status: Meeting['status']) => {
     setMeetings(prev => prev.map(m => m.id === id ? { ...m, status } : m));
   };
-  
+
   const handleDeleteMeeting = (id: string) => {
     if (window.confirm("Remove this meeting?")) {
       setMeetings(prev => prev.filter(m => m.id !== id));
@@ -344,13 +346,13 @@ const App: React.FC = () => {
   };
 
   const handleDeleteFocusItem = (index: number) => {
-     setFocusItems(prev => prev.filter((_, i) => i !== index));
+    setFocusItems(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleDismissNotification = (id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
   };
-  
+
   const handleClearChat = () => {
     setChatMessages([]);
   };
@@ -436,7 +438,7 @@ const App: React.FC = () => {
       return;
     }
     executePlannerActions(commandPreviewActions);
-    
+
     // Add a notification that a command was executed
     setNotifications(prev => [
       {
@@ -450,8 +452,8 @@ const App: React.FC = () => {
   };
 
   return (
-    <AppShell 
-      currentMode={mode} 
+    <AppShell
+      currentMode={mode}
       onModeChange={handleModeChange}
       onOpenSettings={() => setIsSettingsOpen(true)}
       onOpenInsights={() => setIsInsightsOpen(true)}
@@ -460,35 +462,35 @@ const App: React.FC = () => {
       activeMobileTab={activeMobileTab}
       onMobileTabChange={setActiveMobileTab}
     >
-      
+
       {/* DESKTOP LAYOUT (Grid) */}
       <div className="hidden lg:contents">
         <section className="col-span-3 h-full min-h-0">
-          <DiaryPanel 
-            entries={diaryEntries} 
-            onAddEntry={handleAddDiaryEntry} 
+          <DiaryPanel
+            entries={diaryEntries}
+            onAddEntry={handleAddDiaryEntry}
             onDeleteEntry={handleDeleteDiaryEntry}
           />
         </section>
 
         <section className="col-span-6 h-full min-h-0">
-          <ChatPanel 
-            messages={chatMessages} 
+          <ChatPanel
+            messages={chatMessages}
             onSendMessage={handleSendMessage}
             voiceInputEnabled={settings.voiceInputEnabled}
             voiceOutputEnabled={settings.voiceOutputEnabled}
             isProcessing={isProcessing}
           />
           {isProcessing && (
-             <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-white px-3 py-1 rounded-full shadow text-xs text-indigo-500 animate-pulse z-10">
-               Processing...
-             </div>
+            <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-white px-3 py-1 rounded-full shadow text-xs text-indigo-500 animate-pulse z-10">
+              Processing...
+            </div>
           )}
         </section>
 
         <section className="col-span-3 h-full min-h-0">
-          <TodayPanel 
-            meetings={meetings} 
+          <TodayPanel
+            meetings={meetings}
             notifications={notifications}
             focusItems={focusItems}
             contacts={contacts}
@@ -504,16 +506,16 @@ const App: React.FC = () => {
       {/* MOBILE LAYOUT (Tabs) */}
       <div className="lg:hidden h-full flex flex-col min-h-0">
         {activeMobileTab === 'diary' && (
-          <DiaryPanel 
-            entries={diaryEntries} 
-            onAddEntry={handleAddDiaryEntry} 
+          <DiaryPanel
+            entries={diaryEntries}
+            onAddEntry={handleAddDiaryEntry}
             onDeleteEntry={handleDeleteDiaryEntry}
           />
         )}
         {activeMobileTab === 'chat' && (
           <div className="h-full relative">
-            <ChatPanel 
-              messages={chatMessages} 
+            <ChatPanel
+              messages={chatMessages}
               onSendMessage={handleSendMessage}
               voiceInputEnabled={settings.voiceInputEnabled}
               voiceOutputEnabled={settings.voiceOutputEnabled}
@@ -527,8 +529,8 @@ const App: React.FC = () => {
           </div>
         )}
         {activeMobileTab === 'today' && (
-          <TodayPanel 
-            meetings={meetings} 
+          <TodayPanel
+            meetings={meetings}
             notifications={notifications}
             focusItems={focusItems}
             contacts={contacts}
@@ -543,7 +545,7 @@ const App: React.FC = () => {
 
       {/* MODALS */}
       {isSettingsOpen && (
-        <SettingsPanel 
+        <SettingsPanel
           settings={settings}
           onChange={setSettings}
           onClose={() => setIsSettingsOpen(false)}
@@ -553,7 +555,7 @@ const App: React.FC = () => {
       )}
 
       {isInsightsOpen && (
-        <InsightsPanel 
+        <InsightsPanel
           diaryEntries={diaryEntries}
           meetings={meetings}
           actionLog={actionLog}

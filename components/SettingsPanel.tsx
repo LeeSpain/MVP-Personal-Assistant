@@ -3,9 +3,22 @@
 import { useState } from "react";
 import Card from "./Card";
 import Modal from "./Modal";
+import { Settings } from "../types";
 
-export default function SettingsPanel() {
+interface SettingsPanelProps {
+  settings: Settings;
+  onChange: (settings: Settings) => void;
+  onClose: () => void;
+  onReset: () => void;
+  onClearChat: () => void;
+}
+
+export default function SettingsPanel({ settings, onChange, onClose, onReset, onClearChat }: SettingsPanelProps) {
   const [open, setOpen] = useState(false);
+
+  const handleChange = (key: keyof Settings, value: any) => {
+    onChange({ ...settings, [key]: value });
+  };
 
   return (
     <>
@@ -31,18 +44,22 @@ export default function SettingsPanel() {
           </h3>
           <div className="space-y-2">
             <label className="flex flex-col gap-1 text-xs text-slate-300">
-              Display name
-              <input
-                className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-100 outline-none focus:border-violet-500"
-                placeholder="How the assistant should call you"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-slate-300">
-              Short bio / focus
+              Goals
               <textarea
                 rows={2}
                 className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-100 outline-none focus:border-violet-500"
-                placeholder="e.g. 'Help me with business planning, health tracking and daily execution.'"
+                placeholder="e.g. 'Help me with business planning...'"
+                value={settings.goals}
+                onChange={(e) => handleChange('goals', e.target.value)}
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-slate-300">
+              AI Behavior
+              <input
+                className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-100 outline-none focus:border-violet-500"
+                placeholder="e.g. 'Concise, professional'"
+                value={settings.aiBehavior}
+                onChange={(e) => handleChange('aiBehavior', e.target.value)}
               />
             </label>
           </div>
@@ -51,67 +68,55 @@ export default function SettingsPanel() {
         {/* Behaviour */}
         <section>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
-            Assistant Behaviour
+            Automation
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-300">
             <label className="flex items-center gap-2">
-              <input type="checkbox" className="h-3 w-3" />
-              Be proactive with suggestions
+              <input
+                type="checkbox"
+                className="h-3 w-3"
+                checked={settings.autoCreateMeetings}
+                onChange={(e) => handleChange('autoCreateMeetings', e.target.checked)}
+              />
+              Auto-create meetings
             </label>
             <label className="flex items-center gap-2">
-              <input type="checkbox" className="h-3 w-3" />
-              Ask clarifying questions before acting
+              <input
+                type="checkbox"
+                className="h-3 w-3"
+                checked={settings.requireConfirmBeforeEmail}
+                onChange={(e) => handleChange('requireConfirmBeforeEmail', e.target.checked)}
+              />
+              Confirm before email
             </label>
             <label className="flex items-center gap-2">
-              <input type="checkbox" className="h-3 w-3" />
-              Turn long chats into summaries automatically
+              <input
+                type="checkbox"
+                className="h-3 w-3"
+                checked={settings.voiceInputEnabled}
+                onChange={(e) => handleChange('voiceInputEnabled', e.target.checked)}
+              />
+              Voice Input Enabled
             </label>
             <label className="flex items-center gap-2">
-              <input type="checkbox" className="h-3 w-3" />
-              Highlight follow-ups I might forget
+              <input
+                type="checkbox"
+                className="h-3 w-3"
+                checked={settings.voiceOutputEnabled}
+                onChange={(e) => handleChange('voiceOutputEnabled', e.target.checked)}
+              />
+              Voice Output Enabled
             </label>
           </div>
         </section>
 
-        {/* Memory / data sources */}
-        <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
-            Memory & Data Sources
+        <section className="pt-4 border-t border-slate-800">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-red-400 mb-2">
+            Danger Zone
           </h3>
-          <div className="space-y-2 text-xs text-slate-300">
-            <label className="flex items-center justify-between gap-2">
-              <span>Store chat history as long-term memory</span>
-              <input type="checkbox" className="h-3 w-3" />
-            </label>
-            <label className="flex items-center justify-between gap-2">
-              <span>Use diary entries when answering questions</span>
-              <input type="checkbox" className="h-3 w-3" />
-            </label>
-            <label className="flex items-center justify-between gap-2">
-              <span>Use task/CRM data for insights</span>
-              <input type="checkbox" className="h-3 w-3" />
-            </label>
-          </div>
-        </section>
-
-        {/* Notifications */}
-        <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
-            Notifications
-          </h3>
-          <div className="space-y-2 text-xs text-slate-300">
-            <label className="flex items-center gap-2">
-              <input type="checkbox" className="h-3 w-3" />
-              Daily check-in summary
-            </label>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" className="h-3 w-3" />
-              Weekly review & planning email
-            </label>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" className="h-3 w-3" />
-              Alerts when something important is overdue
-            </label>
+          <div className="flex gap-3">
+            <button onClick={onClearChat} className="text-xs text-slate-400 hover:text-slate-200 underline">Clear Chat History</button>
+            <button onClick={onReset} className="text-xs text-red-500 hover:text-red-400 underline">Reset All Data</button>
           </div>
         </section>
 
@@ -121,11 +126,6 @@ export default function SettingsPanel() {
             className="rounded-full bg-slate-800 px-4 py-1.5 text-xs font-medium text-slate-100 hover:bg-slate-700"
           >
             Close
-          </button>
-          <button
-            className="rounded-full bg-violet-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-violet-500"
-          >
-            Save (wire up later)
           </button>
         </div>
       </Modal>
