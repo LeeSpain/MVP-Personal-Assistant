@@ -13,6 +13,9 @@ interface AppShellProps {
   onOpenCommandPalette: () => void;
   activeMobileTab?: MobileTab;
   onMobileTabChange?: (tab: MobileTab) => void;
+  onGenerateDailySummary: () => void;
+  onGenerateWeeklySummary: () => void;
+  isSummarizing: boolean;
 }
 
 const AppShell: React.FC<AppShellProps> = ({
@@ -24,7 +27,10 @@ const AppShell: React.FC<AppShellProps> = ({
   onOpenContacts,
   onOpenCommandPalette,
   activeMobileTab,
-  onMobileTabChange
+  onMobileTabChange,
+  onGenerateDailySummary,
+  onGenerateWeeklySummary,
+  isSummarizing
 }) => {
   const getModeStyles = (m: Mode) => {
     switch (m) {
@@ -46,6 +52,9 @@ const AppShell: React.FC<AppShellProps> = ({
           onOpenInsights={onOpenInsights}
           onOpenContacts={onOpenContacts}
           onOpenCommandPalette={onOpenCommandPalette}
+          onGenerateDailySummary={onGenerateDailySummary}
+          onGenerateWeeklySummary={onGenerateWeeklySummary}
+          isSummarizing={isSummarizing}
         />
       </div>
 

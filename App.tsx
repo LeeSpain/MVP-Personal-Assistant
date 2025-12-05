@@ -727,6 +727,39 @@ const App: React.FC = () => {
       onOpenCommandPalette={handleOpenCommandPalette}
       activeMobileTab={activeMobileTab}
       onMobileTabChange={setActiveMobileTab}
+      onGenerateDailySummary={async () => {
+        const summary = await generateSummary({
+          diaryEntries,
+          meetings,
+          chatHistory: chatMessages,
+          timeframe: 'day'
+        });
+        if (summary) {
+          setDailySummary(summary);
+          alert("Daily Summary Generated!");
+        }
+      }}
+      onGenerateWeeklySummary={async () => {
+        // Filter for last 7 days
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+        const recentDiary = diaryEntries.filter(d => new Date(d.createdAt) > oneWeekAgo);
+        const recentMeetings = meetings.filter(m => new Date(m.startTime) > oneWeekAgo);
+        const recentChat = chatMessages.filter(c => new Date(c.timestamp) > oneWeekAgo);
+
+        const summary = await generateSummary({
+          diaryEntries: recentDiary,
+          meetings: recentMeetings,
+          chatHistory: recentChat,
+          timeframe: 'week'
+        });
+        if (summary) {
+          setWeeklySummary(summary);
+          alert("Weekly Summary Generated!");
+        }
+      }}
+      isSummarizing={isSummarizing}
     >
       {/* Undo Ribbon */}
       {lastActionBatch && (
@@ -767,50 +800,7 @@ const App: React.FC = () => {
             </div>
           )}
           <div className="absolute top-4 right-4 flex gap-2">
-            <button
-              onClick={async () => {
-                const summary = await generateSummary({
-                  diaryEntries,
-                  meetings,
-                  chatHistory: chatMessages,
-                  timeframe: 'day'
-                });
-                if (summary) {
-                  setDailySummary(summary);
-                  alert("Daily Summary Generated!");
-                }
-              }}
-              className="text-xs text-slate-400 hover:text-slate-600"
-              disabled={isSummarizing}
-            >
-              {isSummarizing ? '...' : '🔄 Day'}
-            </button>
-            <button
-              onClick={async () => {
-                // Filter for last 7 days
-                const oneWeekAgo = new Date();
-                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-
-                const recentDiary = diaryEntries.filter(d => new Date(d.createdAt) > oneWeekAgo);
-                const recentMeetings = meetings.filter(m => new Date(m.startTime) > oneWeekAgo);
-                const recentChat = chatMessages.filter(c => new Date(c.timestamp) > oneWeekAgo);
-
-                const summary = await generateSummary({
-                  diaryEntries: recentDiary,
-                  meetings: recentMeetings,
-                  chatHistory: recentChat,
-                  timeframe: 'week'
-                });
-                if (summary) {
-                  setWeeklySummary(summary);
-                  alert("Weekly Summary Generated!");
-                }
-              }}
-              className="text-xs text-slate-400 hover:text-slate-600"
-              disabled={isSummarizing}
-            >
-              {isSummarizing ? '...' : '📅 Week'}
-            </button>
+            {/* Summary buttons moved to Topbar */}
           </div>
         </section>
 

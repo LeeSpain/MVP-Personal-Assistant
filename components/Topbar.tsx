@@ -8,6 +8,9 @@ interface TopbarProps {
   onOpenInsights: () => void;
   onOpenContacts: () => void;
   onOpenCommandPalette: () => void;
+  onGenerateDailySummary: () => void;
+  onGenerateWeeklySummary: () => void;
+  isSummarizing: boolean;
 }
 
 const MODES: Mode[] = ['Deep Work', 'Execution', 'Relationship', 'Recovery'];
@@ -19,6 +22,9 @@ export const Topbar: React.FC<TopbarProps> = ({
   onOpenInsights,
   onOpenContacts,
   onOpenCommandPalette,
+  onGenerateDailySummary,
+  onGenerateWeeklySummary,
+  isSummarizing
 }) => {
   return (
     <header className="h-16 border-b border-slate-800 bg-slate-900/80 backdrop-blur px-4 lg:px-6 flex items-center justify-between shrink-0 z-20">
@@ -44,6 +50,21 @@ export const Topbar: React.FC<TopbarProps> = ({
       </div>
 
       <div className="flex items-center gap-2">
+        <button
+          onClick={onGenerateDailySummary}
+          disabled={isSummarizing}
+          className="hidden md:inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors disabled:opacity-50"
+        >
+          {isSummarizing ? '...' : 'Day'}
+        </button>
+        <button
+          onClick={onGenerateWeeklySummary}
+          disabled={isSummarizing}
+          className="hidden md:inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors disabled:opacity-50"
+        >
+          {isSummarizing ? '...' : 'Week'}
+        </button>
+        <div className="w-px h-6 bg-slate-800 mx-1"></div>
         <button onClick={onOpenCommandPalette} className="hidden md:inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">Command</button>
         <button onClick={onOpenContacts} className="hidden md:inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">Contacts</button>
         <button onClick={onOpenInsights} className="inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">Insights</button>
