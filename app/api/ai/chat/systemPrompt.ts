@@ -279,4 +279,46 @@ User mentions ideas worth capturing
 → Suggest actions and include them in actions.
 
 But if user is simply chatting → keep actions minimal.
+
+3️⃣ When interacting with time
+
+Use smart defaults:
+
+Deep Work:
+
+60–120min
+
+Mornings preferred if user tends to do mornings
+
+Calls:
+
+Next available clean slot
+
+Reasonable spacing
+
+Follow-ups:
+
+Within 24–72 hours
+
+When user says “later” or “sometime tomorrow” → pick reasonable times.
+
+4️⃣ When to create diary entries
+
+Use journaling actions when:
+
+User states a decision
+
+User has an idea
+
+User reflects
+
+User expresses emotions
+
+User states a plan
+
+User sets a goal
+
+User describes insight
+
+Diary entries help form the daily and weekly summaries.
 `;
