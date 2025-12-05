@@ -12,6 +12,7 @@ import CalendarPanel from './components/CalendarPanel';
 import { CommandPalette } from './components/CommandPalette';
 import ChatHistoryModal from './components/ChatHistoryModal';
 import { MobileNav, MobileTab } from './components/MobileNav';
+import SummaryModal from './components/SummaryModal';
 import { geminiService, sendMessage } from './services/geminiService';
 import { useTextToSpeech } from './hooks/useTextToSpeech';
 import { useMemorySummarizer } from './hooks/useMemorySummarizer';
@@ -82,6 +83,8 @@ const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [isContactsOpen, setIsContactsOpen] = useState(false);
+  const [isDailySummaryOpen, setIsDailySummaryOpen] = useState(false);
+  const [isWeeklySummaryOpen, setIsWeeklySummaryOpen] = useState(false);
 
   // Command Palette State
   const [isCommandOpen, setIsCommandOpen] = useState(false);
@@ -717,6 +720,51 @@ const App: React.FC = () => {
     handleCloseCommandPalette();
   };
 
+  const generateDailySummary = async () => {
+    const summary = await generateSummary({
+      diaryEntries,
+      meetings,
+      chatHistory: chatMessages,
+      timeframe: 'day'
+    });
+    if (summary) {
+      setDailySummary(summary);
+    }
+  };
+
+  const handleGenerateDailySummary = async () => {
+    setIsDailySummaryOpen(true);
+    if (!dailySummary) {
+      await generateDailySummary();
+    }
+  };
+
+  const generateWeeklySummary = async () => {
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    const recentDiary = diaryEntries.filter(d => new Date(d.createdAt) > oneWeekAgo);
+    const recentMeetings = meetings.filter(m => new Date(m.startTime) > oneWeekAgo);
+    const recentChat = chatMessages.filter(c => new Date(c.timestamp) > oneWeekAgo);
+
+    const summary = await generateSummary({
+      diaryEntries: recentDiary,
+      meetings: recentMeetings,
+      chatHistory: recentChat,
+      timeframe: 'week'
+    });
+    if (summary) {
+      setWeeklySummary(summary);
+    }
+  };
+
+  const handleGenerateWeeklySummary = async () => {
+    setIsWeeklySummaryOpen(true);
+    if (!weeklySummary) {
+      await generateWeeklySummary();
+    }
+  };
+
   return (
     <AppShell
       currentMode={mode}
@@ -727,38 +775,8 @@ const App: React.FC = () => {
       onOpenCommandPalette={handleOpenCommandPalette}
       activeMobileTab={activeMobileTab}
       onMobileTabChange={setActiveMobileTab}
-      onGenerateDailySummary={async () => {
-        const summary = await generateSummary({
-          diaryEntries,
-          meetings,
-          chatHistory: chatMessages,
-          timeframe: 'day'
-        });
-        if (summary) {
-          setDailySummary(summary);
-          alert("Daily Summary Generated!");
-        }
-      }}
-      onGenerateWeeklySummary={async () => {
-        // Filter for last 7 days
-        const oneWeekAgo = new Date();
-        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-
-        const recentDiary = diaryEntries.filter(d => new Date(d.createdAt) > oneWeekAgo);
-        const recentMeetings = meetings.filter(m => new Date(m.startTime) > oneWeekAgo);
-        const recentChat = chatMessages.filter(c => new Date(c.timestamp) > oneWeekAgo);
-
-        const summary = await generateSummary({
-          diaryEntries: recentDiary,
-          meetings: recentMeetings,
-          chatHistory: recentChat,
-          timeframe: 'week'
-        });
-        if (summary) {
-          setWeeklySummary(summary);
-          alert("Weekly Summary Generated!");
-        }
-      }}
+      onGenerateDailySummary={handleGenerateDailySummary}
+      onGenerateWeeklySummary={handleGenerateWeeklySummary}
       isSummarizing={isSummarizing}
     >
       {/* Undo Ribbon */}
@@ -949,6 +967,24 @@ const App: React.FC = () => {
           onClose={handleCloseCommandPalette}
         />
       )}
+
+      <SummaryModal
+        open={isDailySummaryOpen}
+        onClose={() => setIsDailySummaryOpen(false)}
+        title="Daily Briefing"
+        summary={dailySummary}
+        isLoading={isSummarizing && isDailySummaryOpen}
+        onRegenerate={generateDailySummary}
+      />
+
+      <SummaryModal
+        open={isWeeklySummaryOpen}
+        onClose={() => setIsWeeklySummaryOpen(false)}
+        title="Weekly Review"
+        summary={weeklySummary}
+        isLoading={isSummarizing && isWeeklySummaryOpen}
+        onRegenerate={generateWeeklySummary}
+      />
 
     </AppShell>
   );
