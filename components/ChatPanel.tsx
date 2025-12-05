@@ -72,8 +72,8 @@ export default function ChatPanel({
   };
 
   return (
-    <Card title="Chat">
-      <div className="absolute top-4 right-4 z-10 flex gap-2">
+    <Card title="Chat" className="relative">
+      <div className="absolute top-0 right-0 z-10 flex gap-2">
         {onOpenHistory && (
           <button
             onClick={onOpenHistory}
@@ -92,81 +92,80 @@ export default function ChatPanel({
           {voiceOutputEnabled ? '🔊' : '🔇'}
         </button>
       </div>
-      <div className="flex h-full flex-col">
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto pr-1 space-y-3 mb-3">
-          {messages.map((m) => (
-            <div
-              key={m.id}
-              className={`flex ${m.role === "user" ? "justify-end" : "justify-start"
-                }`}
-            >
-              <div
-                className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${m.role === "user"
-                  ? "bg-violet-500 text-white"
-                  : "bg-slate-800 text-slate-100"
-                  }`}
-              >
-                {m.content}
-              </div>
-            </div>
-          ))}
-          {isProcessing && (
-            <div className="text-xs text-slate-400 animate-pulse">Thinking…</div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
 
-        {/* Input */}
-        <form
-          onSubmit={handleSubmit}
-          className="mt-auto flex items-center gap-2 border-t border-slate-800 pt-3"
-        >
-          {hasRecognitionSupport && (
-            <button
-              type="button"
-              onClick={voiceInputEnabled ? handleMicClick : undefined}
-              className={`p-2 rounded-full transition-all ${!voiceInputEnabled
-                ? "bg-slate-800/50 text-slate-600 cursor-not-allowed"
-                : isListening
-                  ? "bg-red-500/20 text-red-400 animate-pulse ring-1 ring-red-500"
-                  : "bg-slate-800 text-slate-400 hover:text-slate-200"
-                }`}
-              title={
-                !voiceInputEnabled
-                  ? "Enable voice input in Settings"
-                  : isListening
-                    ? "Stop Listening"
-                    : "Start Listening"
-              }
-            >
-              🎤
-            </button>
-          )}
-
-          <input
-            className="flex-1 rounded-full bg-slate-900/80 px-3 py-2 text-sm outline-none ring-0 focus:ring-1 focus:ring-violet-500/50 transition-all placeholder:text-slate-600 text-slate-200"
-            placeholder={isListening ? "Listening..." : "Type a message..."}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            disabled={isProcessing}
-          />
-          <button
-            type="submit"
-            disabled={!input.trim() || isProcessing}
-            className="rounded-full bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto pr-1 space-y-3 mb-3 min-h-0 custom-scrollbar">
+        {messages.map((m) => (
+          <div
+            key={m.id}
+            className={`flex ${m.role === "user" ? "justify-end" : "justify-start"
+              }`}
           >
-            Send
-          </button>
-        </form>
+            <div
+              className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${m.role === "user"
+                ? "bg-violet-500 text-white"
+                : "bg-slate-800 text-slate-100"
+                }`}
+            >
+              {m.content}
+            </div>
+          </div>
+        ))}
+        {isProcessing && (
+          <div className="text-xs text-slate-400 animate-pulse">Thinking…</div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
 
-        {/* Context Hints */}
-        <div className="mt-2 px-2 text-[10px] text-slate-500 text-center">
-          <span className="opacity-70">Try saying: </span>
-          <span className="italic text-slate-400">
-            "{['Create a deep work block tomorrow for ICE Alarm', 'Switch me to Recovery mode', 'Plan my week based on my goals', 'Add a focus item to call John'][Math.floor(Math.random() * 4)]}"
-          </span>
-        </div>
+      {/* Input */}
+      <form
+        onSubmit={handleSubmit}
+        className="mt-auto flex items-center gap-2 border-t border-slate-800 pt-3 shrink-0"
+      >
+        {hasRecognitionSupport && (
+          <button
+            type="button"
+            onClick={voiceInputEnabled ? handleMicClick : undefined}
+            className={`p-2 rounded-full transition-all ${!voiceInputEnabled
+              ? "bg-slate-800/50 text-slate-600 cursor-not-allowed"
+              : isListening
+                ? "bg-red-500/20 text-red-400 animate-pulse ring-1 ring-red-500"
+                : "bg-slate-800 text-slate-400 hover:text-slate-200"
+              }`}
+            title={
+              !voiceInputEnabled
+                ? "Enable voice input in Settings"
+                : isListening
+                  ? "Stop Listening"
+                  : "Start Listening"
+            }
+          >
+            🎤
+          </button>
+        )}
+
+        <input
+          className="flex-1 rounded-full bg-slate-900/80 px-3 py-2 text-sm outline-none ring-0 focus:ring-1 focus:ring-violet-500/50 transition-all placeholder:text-slate-600 text-slate-200"
+          placeholder={isListening ? "Listening..." : "Type a message..."}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          disabled={isProcessing}
+        />
+        <button
+          type="submit"
+          disabled={!input.trim() || isProcessing}
+          className="rounded-full bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          Send
+        </button>
+      </form>
+
+      {/* Context Hints */}
+      <div className="mt-2 px-2 text-[10px] text-slate-500 text-center shrink-0">
+        <span className="opacity-70">Try saying: </span>
+        <span className="italic text-slate-400">
+          "{['Create a deep work block tomorrow for ICE Alarm', 'Switch me to Recovery mode', 'Plan my week based on my goals', 'Add a focus item to call John'][Math.floor(Math.random() * 4)]}"
+        </span>
       </div>
     </Card>
   );

@@ -2,7 +2,8 @@ import { useState } from 'react';
 import Card from './Card';
 import { MonthView, WeekView } from './CalendarViews';
 import { Meeting } from '../types';
-import { addMonths, subMonths, addWeeks, subWeeks, format } from 'date-fns';
+import { addMonths, subMonths, addWeeks, subWeeks, format, isSameDay } from 'date-fns';
+import DayDetailModal from './DayDetailModal';
 
 interface CalendarPanelProps {
     meetings: Meeting[];
@@ -17,6 +18,7 @@ export default function CalendarPanel({
 }: CalendarPanelProps) {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [view, setView] = useState<'month' | 'week'>('month');
+    const [selectedDay, setSelectedDay] = useState<Date | null>(null);
 
     const handlePrev = () => {
         if (view === 'month') {
@@ -36,6 +38,10 @@ export default function CalendarPanel({
 
     const handleToday = () => {
         setCurrentDate(new Date());
+    };
+
+    const handleDayClick = (day: Date) => {
+        setSelectedDay(day);
     };
 
     return (
@@ -76,6 +82,7 @@ export default function CalendarPanel({
                             meetings={meetings}
                             onUpdateStatus={onUpdateMeetingStatus}
                             onDelete={onDeleteMeeting}
+                            onDayClick={handleDayClick}
                         />
                     ) : (
                         <WeekView
@@ -83,10 +90,19 @@ export default function CalendarPanel({
                             meetings={meetings}
                             onUpdateStatus={onUpdateMeetingStatus}
                             onDelete={onDeleteMeeting}
+                            onDayClick={handleDayClick}
                         />
                     )}
                 </div>
             </div>
+
+            <DayDetailModal
+                date={selectedDay}
+                onClose={() => setSelectedDay(null)}
+                meetings={selectedDay ? meetings.filter(m => isSameDay(new Date(m.startTime), selectedDay)) : []}
+                onUpdateStatus={onUpdateMeetingStatus}
+                onDelete={onDeleteMeeting}
+            />
         </Card>
     );
 }

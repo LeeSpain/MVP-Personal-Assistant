@@ -61,7 +61,13 @@ const DEFAULT_SETTINGS: Settings = {
 const App: React.FC = () => {
   // --- Local State ---
   const [isInitialized, setIsInitialized] = useState(false);
-  const [mode, setMode] = useState<Mode>('Execution');
+  const [mode, setMode] = useState<Mode>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('mvb_mode');
+      return (saved as Mode) || 'Execution';
+    }
+    return 'Execution';
+  });
   const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>(INITIAL_DIARY);
   const [meetings, setMeetings] = useState<Meeting[]>(INITIAL_MEETINGS);
   const [notifications, setNotifications] = useState<Notification[]>(INITIAL_NOTIFICATIONS);

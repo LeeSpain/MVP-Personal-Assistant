@@ -20,10 +20,11 @@ interface CalendarViewProps {
     meetings: Meeting[];
     onUpdateStatus: (id: string, status: Meeting['status']) => void;
     onDelete: (id: string) => void;
+    onDayClick: (day: Date) => void;
 }
 
 // --- Month View ---
-export const MonthView: React.FC<CalendarViewProps> = ({ currentDate, meetings, onUpdateStatus, onDelete }) => {
+export const MonthView: React.FC<CalendarViewProps> = ({ currentDate, meetings, onUpdateStatus, onDelete, onDayClick }) => {
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(monthStart);
     const startDate = startOfWeek(monthStart, { weekStartsOn: 1 }); // Monday start
@@ -53,7 +54,8 @@ export const MonthView: React.FC<CalendarViewProps> = ({ currentDate, meetings, 
                     return (
                         <div
                             key={day.toString()}
-                            className={`border-r border-b border-slate-800/50 p-1 min-h-[80px] relative group ${!isCurrentMonth ? 'bg-slate-950/50 text-slate-600' : 'bg-transparent'
+                            onClick={() => onDayClick(day)}
+                            className={`border-r border-b border-slate-800/50 p-1 min-h-[80px] relative group cursor-pointer hover:bg-slate-800/30 transition-colors ${!isCurrentMonth ? 'bg-slate-950/50 text-slate-600' : 'bg-transparent'
                                 }`}
                         >
                             <div className={`text-xs font-medium mb-1 ${isToday ? 'text-violet-400' : 'text-slate-400'}`}>
@@ -64,9 +66,13 @@ export const MonthView: React.FC<CalendarViewProps> = ({ currentDate, meetings, 
                                 {dayMeetings.map(meeting => (
                                     <div
                                         key={meeting.id}
-                                        className={`text-[10px] px-1.5 py-0.5 rounded truncate cursor-pointer transition-colors group/item relative ${meeting.status === 'confirmed' ? 'bg-indigo-600/30 text-indigo-200 border border-indigo-500/30' :
-                                                meeting.status === 'cancelled' ? 'bg-slate-800 text-slate-500 line-through' :
-                                                    'bg-amber-500/10 text-amber-200 border border-amber-500/30 border-dashed'
+                                        onClick={(e) => {
+                                            e.stopPropagation(); // Prevent opening day modal when clicking a meeting
+                                            // Maybe open meeting details? For now just stop prop.
+                                        }}
+                                        className={`text-[10px] px-1.5 py-0.5 rounded truncate cursor-default transition-colors group/item relative ${meeting.status === 'confirmed' ? 'bg-indigo-600/30 text-indigo-200 border border-indigo-500/30' :
+                                            meeting.status === 'cancelled' ? 'bg-slate-800 text-slate-500 line-through' :
+                                                'bg-amber-500/10 text-amber-200 border border-amber-500/30 border-dashed'
                                             }`}
                                         title={`${meeting.title} (${format(new Date(meeting.startTime), 'HH:mm')})`}
                                     >
@@ -94,7 +100,7 @@ export const MonthView: React.FC<CalendarViewProps> = ({ currentDate, meetings, 
 };
 
 // --- Week View ---
-export const WeekView: React.FC<CalendarViewProps> = ({ currentDate, meetings, onUpdateStatus, onDelete }) => {
+export const WeekView: React.FC<CalendarViewProps> = ({ currentDate, meetings, onUpdateStatus, onDelete, onDayClick }) => {
     const startDate = startOfWeek(currentDate, { weekStartsOn: 1 });
     const days = Array.from({ length: 7 }).map((_, i) => addDays(startDate, i));
     const hours = Array.from({ length: 17 }).map((_, i) => i + 6); // 6 AM to 10 PM
@@ -106,7 +112,11 @@ export const WeekView: React.FC<CalendarViewProps> = ({ currentDate, meetings, o
                 {days.map(day => {
                     const isToday = isSameDay(day, new Date());
                     return (
-                        <div key={day.toString()} className="flex-1 py-2 text-center border-l border-slate-800/50">
+                        <div
+                            key={day.toString()}
+                            onClick={() => onDayClick(day)}
+                            className="flex-1 py-2 text-center border-l border-slate-800/50 cursor-pointer hover:bg-slate-800/30 transition-colors"
+                        >
                             <div className={`text-xs font-semibold uppercase ${isToday ? 'text-violet-400' : 'text-slate-500'}`}>
                                 {format(day, 'EEE')}
                             </div>
@@ -157,8 +167,8 @@ export const WeekView: React.FC<CalendarViewProps> = ({ currentDate, meetings, o
                             <div
                                 key={meeting.id}
                                 className={`absolute left-10 right-0 z-10 mx-1 rounded p-1 text-[10px] overflow-hidden border cursor-pointer group ${meeting.status === 'confirmed' ? 'bg-indigo-600/80 text-white border-indigo-500' :
-                                        meeting.status === 'cancelled' ? 'bg-slate-800/80 text-slate-500 border-slate-700 line-through' :
-                                            'bg-amber-600/80 text-white border-amber-500 border-dashed'
+                                    meeting.status === 'cancelled' ? 'bg-slate-800/80 text-slate-500 border-slate-700 line-through' :
+                                        'bg-amber-600/80 text-white border-amber-500 border-dashed'
                                     }`}
                                 style={{
                                     width: `calc((100% - 40px) / 7 - 4px)`,
