@@ -8,13 +8,16 @@ import TodayPanel from './components/TodayPanel';
 import SettingsPanel from './components/SettingsPanel';
 import InsightsPanel from './components/InsightsPanel';
 import { ContactsPanel } from './components/ContactsPanel';
+import CalendarPanel from './components/CalendarPanel';
 import { CommandPalette } from './components/CommandPalette';
+import ChatHistoryModal from './components/ChatHistoryModal';
 import { MobileNav, MobileTab } from './components/MobileNav';
 import { geminiService, sendMessage } from './services/geminiService';
 import { useTextToSpeech } from './hooks/useTextToSpeech';
 import { useMemorySummarizer } from './hooks/useMemorySummarizer';
 import {
   ChatMessage,
+  ChatSession,
   DiaryEntry,
   DiaryType,
   Meeting,
@@ -77,7 +80,6 @@ const App: React.FC = () => {
   const [memories, setMemories] = useState<MemoryItem[]>([]);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isInsightsOpen, setIsInsightsOpen] = useState(false);
   const [isContactsOpen, setIsContactsOpen] = useState(false);
 
   // Command Palette State
@@ -120,6 +122,8 @@ const App: React.FC = () => {
       timestamp: new Date()
     }
   ]);
+  const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   // --- Persistence: Load on Mount ---
   useEffect(() => {
@@ -162,10 +166,40 @@ const App: React.FC = () => {
           setSettings({ ...DEFAULT_SETTINGS, ...parsedSettings });
         }
 
+        // Chat History Logic
+        const savedHistory = localStorage.getItem('mvb_chat_history');
+        let loadedHistory: ChatSession[] = [];
+        if (savedHistory) {
+          loadedHistory = JSON.parse(savedHistory);
+          setChatHistory(loadedHistory);
+        }
+
         const savedChat = localStorage.getItem('mvb_chat');
         if (savedChat) {
-          const parsed = JSON.parse(savedChat);
-          setChatMessages(parsed.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) })));
+          const parsedChat: ChatMessage[] = JSON.parse(savedChat);
+
+          // Archive previous session if it has meaningful content (more than just welcome msg)
+          if (parsedChat.length > 1) {
+            const lastSession: ChatSession = {
+              id: crypto.randomUUID(),
+              timestamp: new Date().toISOString(),
+              messages: parsedChat,
+              summary: parsedChat[1]?.content.substring(0, 50) + "..." // Simple summary from first user msg
+            };
+
+            // Prepend to history
+            const newHistory = [lastSession, ...loadedHistory];
+            setChatHistory(newHistory);
+            localStorage.setItem('mvb_chat_history', JSON.stringify(newHistory));
+
+            // Clear active chat (it's already reset by default state, so just don't load it)
+            console.log("Archived previous session to history.");
+          } else {
+            // If it was empty/short, maybe we restore it? 
+            // User requested "refresh = clear", so we should probably NOT restore it even if short,
+            // unless we want to be nice. But strict request was "clear and start again".
+            // So we do nothing, letting the default 'welcome' state take over.
+          }
         }
 
         const savedContacts = localStorage.getItem('mvb_contacts');
@@ -212,9 +246,10 @@ const App: React.FC = () => {
     localStorage.setItem('mvb_action_log', JSON.stringify(actionLog));
     localStorage.setItem('mvb_profile', JSON.stringify(userProfile));
     localStorage.setItem('mvb_memories', JSON.stringify(memories));
+    localStorage.setItem('mvb_chat_history', JSON.stringify(chatHistory));
     if (dailySummary) localStorage.setItem('mvb_daily_summary', dailySummary);
     if (weeklySummary) localStorage.setItem('mvb_weekly_summary', weeklySummary);
-  }, [diaryEntries, meetings, notifications, focusItems, mode, settings, chatMessages, contacts, actionLog, userProfile, memories, dailySummary, weeklySummary, isInitialized]);
+  }, [diaryEntries, meetings, notifications, focusItems, mode, settings, chatMessages, chatHistory, contacts, actionLog, userProfile, memories, dailySummary, weeklySummary, isInitialized]);
 
   // --- Action Executors ---
   const validateAction = (action: PlannerAction): boolean => {
@@ -455,7 +490,8 @@ const App: React.FC = () => {
     setIsProcessing(true);
 
     try {
-      const history = updatedMessages.slice(-5).map(m => ({
+      // Use previous messages for history, excluding the current one we just added
+      const history = chatMessages.slice(-10).map(m => ({
         role: m.role,
         content: m.content
       }));
@@ -721,6 +757,7 @@ const App: React.FC = () => {
             voiceInputEnabled={settings.voiceInputEnabled}
             voiceOutputEnabled={settings.voiceOutputEnabled}
             onToggleVoiceOutput={() => setSettings(prev => ({ ...prev, voiceOutputEnabled: !prev.voiceOutputEnabled }))}
+            onOpenHistory={() => setIsHistoryOpen(true)}
             isProcessing={isProcessing}
           />
           {isProcessing && (
@@ -776,18 +813,27 @@ const App: React.FC = () => {
           </div>
         </section>
 
-        <section className="col-span-3 h-full min-h-0">
-          <TodayPanel
-            meetings={meetings}
-            notifications={notifications}
-            focusItems={focusItems}
-            contacts={contacts}
-            onUpdateMeetingStatus={handleUpdateMeetingStatus}
-            onAddFocusItem={handleAddFocusItem}
-            onDeleteMeeting={handleDeleteMeeting}
-            onDismissNotification={handleDismissNotification}
-            onDeleteFocusItem={handleDeleteFocusItem}
-          />
+        <section className="col-span-3 h-full min-h-0 flex flex-col gap-4">
+          <div className="flex-1 min-h-0">
+            <TodayPanel
+              meetings={meetings}
+              notifications={notifications}
+              focusItems={focusItems}
+              contacts={contacts}
+              onUpdateMeetingStatus={handleUpdateMeetingStatus}
+              onAddFocusItem={handleAddFocusItem}
+              onDeleteMeeting={handleDeleteMeeting}
+              onDismissNotification={handleDismissNotification}
+              onDeleteFocusItem={handleDeleteFocusItem}
+            />
+          </div>
+          <div className="flex-1 min-h-0">
+            <CalendarPanel
+              meetings={meetings}
+              onUpdateMeetingStatus={handleUpdateMeetingStatus}
+              onDeleteMeeting={handleDeleteMeeting}
+            />
+          </div>
         </section>
       </div>
 
@@ -828,6 +874,13 @@ const App: React.FC = () => {
             onDeleteMeeting={handleDeleteMeeting}
             onDismissNotification={handleDismissNotification}
             onDeleteFocusItem={handleDeleteFocusItem}
+          />
+        )}
+        {activeMobileTab === 'calendar' && (
+          <CalendarPanel
+            meetings={meetings}
+            onUpdateMeetingStatus={handleUpdateMeetingStatus}
+            onDeleteMeeting={handleDeleteMeeting}
           />
         )}
       </div>
@@ -881,6 +934,21 @@ const App: React.FC = () => {
           onChange={handleUpdateContacts}
           onClose={() => setIsContactsOpen(false)}
           onSimulateMessage={handleSimulateMessageToContact}
+        />
+      )}
+      <ContactsPanel
+        contacts={contacts}
+        onChange={handleUpdateContacts}
+        onClose={() => setIsContactsOpen(false)}
+        onSimulateMessage={handleSimulateMessageToContact}
+      />
+      )}
+
+      {isHistoryOpen && (
+        <ChatHistoryModal
+          history={chatHistory}
+          onClose={() => setIsHistoryOpen(false)}
+          onDeleteSession={(id) => setChatHistory(prev => prev.filter(s => s.id !== id))}
         />
       )}
 

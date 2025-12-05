@@ -38,14 +38,14 @@ export async function POST(req: NextRequest) {
       contextString = `Context: ${context}`;
     }
 
-    // 2. Build the Full Prompt
+    // 2. Build the System Instruction
     const fullSystemInstruction = `${SYSTEM_PROMPT}\n\n${contextString}`;
 
+    // 3. Construct Contents (Alternating Turns)
+    // Ensure history alternates. If we have User -> User, we must merge or drop.
+    // For simplicity, we'll assume the client sends valid history, but we'll append the current message.
+
     const contents = [
-      {
-        role: "user",
-        parts: [{ text: fullSystemInstruction }]
-      },
       ...history.map((msg: any) => ({
         role: msg.role === 'assistant' ? 'model' : 'user',
         parts: [{ text: msg.content }]
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
       }
     ];
 
-    // 3. Call Gemini API with JSON Mode
+    // 4. Call Gemini API with JSON Mode & System Instruction
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
@@ -65,11 +65,14 @@ export async function POST(req: NextRequest) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: fullSystemInstruction }]
+          },
           contents: contents,
           generationConfig: {
             temperature: 0.7,
             maxOutputTokens: 1000,
-            responseMimeType: "application/json" // Force JSON output
+            responseMimeType: "application/json"
           }
         })
       }

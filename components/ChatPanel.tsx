@@ -12,6 +12,7 @@ interface ChatPanelProps {
   voiceInputEnabled: boolean;
   voiceOutputEnabled: boolean;
   onToggleVoiceOutput: () => void;
+  onOpenHistory?: () => void;
   isProcessing: boolean;
 }
 
@@ -21,6 +22,7 @@ export default function ChatPanel({
   voiceInputEnabled,
   voiceOutputEnabled,
   onToggleVoiceOutput,
+  onOpenHistory,
   isProcessing
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
@@ -71,7 +73,16 @@ export default function ChatPanel({
 
   return (
     <Card title="Chat">
-      <div className="absolute top-4 right-4 z-10">
+      <div className="absolute top-4 right-4 z-10 flex gap-2">
+        {onOpenHistory && (
+          <button
+            onClick={onOpenHistory}
+            className="text-xs p-1.5 rounded-full bg-slate-800 text-slate-500 hover:text-slate-300 transition-colors"
+            title="View Chat History"
+          >
+            🕰️
+          </button>
+        )}
         <button
           onClick={onToggleVoiceOutput}
           className={`text-xs p-1.5 rounded-full transition-colors ${voiceOutputEnabled ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-800 text-slate-500 hover:text-slate-300'

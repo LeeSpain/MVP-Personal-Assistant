@@ -12,13 +12,13 @@ interface TopbarProps {
 
 const MODES: Mode[] = ['Deep Work', 'Execution', 'Relationship', 'Recovery'];
 
-export const Topbar: React.FC<TopbarProps> = ({ 
-  currentMode, 
-  onModeChange, 
-  onOpenSettings, 
-  onOpenInsights, 
+export const Topbar: React.FC<TopbarProps> = ({
+  currentMode,
+  onModeChange,
+  onOpenSettings,
+  onOpenInsights,
   onOpenContacts,
-  onOpenCommandPalette 
+  onOpenCommandPalette,
 }) => {
   return (
     <header className="h-16 border-b border-slate-800 bg-slate-900/80 backdrop-blur px-4 lg:px-6 flex items-center justify-between shrink-0 z-20">
@@ -35,9 +35,8 @@ export const Topbar: React.FC<TopbarProps> = ({
           <button
             key={mode}
             onClick={() => onModeChange(mode)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-              currentMode === mode ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
-            }`}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${currentMode === mode ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+              }`}
           >
             {mode}
           </button>

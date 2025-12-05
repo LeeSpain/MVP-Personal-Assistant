@@ -37,8 +37,45 @@ export default function SettingsPanel({
   // But App.tsx renders this component conditionally: {isSettingsOpen && <SettingsPanel ... />}
   // So we can just render the Modal with open={true}.
 
+  const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+
   const handleChange = (key: keyof Settings, value: any) => {
     onChange({ ...settings, [key]: value });
+  };
+
+  const handleAddIntegration = (type: 'custom' | 'zoho' | 'outlook' | 'teams') => {
+    let newIntegration: any = {
+      id: crypto.randomUUID(),
+      type,
+      enabled: true,
+    };
+
+    switch (type) {
+      case 'zoho':
+        newIntegration.name = 'Zoho CRM';
+        newIntegration.icon = '🏢';
+        newIntegration.description = 'Manage leads and contacts.';
+        break;
+      case 'outlook':
+        newIntegration.name = 'Outlook';
+        newIntegration.icon = '📧';
+        newIntegration.description = 'Sync emails and calendar.';
+        break;
+      case 'teams':
+        newIntegration.name = 'Microsoft Teams';
+        newIntegration.icon = '👥';
+        newIntegration.description = 'Chat and meetings.';
+        break;
+      case 'custom':
+      default:
+        newIntegration.name = 'New Link';
+        newIntegration.icon = '🔗';
+        newIntegration.url = 'https://';
+        break;
+    }
+
+    onChange({ ...settings, integrations: [...settings.integrations, newIntegration] });
+    setIsAddMenuOpen(false);
   };
 
 
@@ -164,22 +201,45 @@ export default function SettingsPanel({
               Manage connections and custom shortcuts.
             </p>
           </div>
-          <button
-            onClick={() => {
-              const newLink = {
-                id: crypto.randomUUID(),
-                type: 'custom' as const,
-                name: 'New Link',
-                icon: '🔗',
-                enabled: true,
-                url: 'https://'
-              };
-              onChange({ ...settings, integrations: [...settings.integrations, newLink] });
-            }}
-            className="text-xs bg-violet-600 hover:bg-violet-500 text-white px-2 py-1 rounded"
-          >
-            + Add Link
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
+              className="text-xs bg-violet-600 hover:bg-violet-500 text-white px-2 py-1 rounded flex items-center gap-1"
+            >
+              + Add Link
+            </button>
+
+            {isAddMenuOpen && (
+              <div className="absolute right-0 top-full mt-1 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                <div className="p-1 space-y-0.5">
+                  <button
+                    onClick={() => handleAddIntegration('custom')}
+                    className="w-full text-left px-3 py-2 text-xs text-slate-200 hover:bg-slate-700 rounded flex items-center gap-2"
+                  >
+                    <span>🔗</span> Custom Link
+                  </button>
+                  <button
+                    onClick={() => handleAddIntegration('zoho')}
+                    className="w-full text-left px-3 py-2 text-xs text-slate-200 hover:bg-slate-700 rounded flex items-center gap-2"
+                  >
+                    <span>🏢</span> Zoho CRM
+                  </button>
+                  <button
+                    onClick={() => handleAddIntegration('outlook')}
+                    className="w-full text-left px-3 py-2 text-xs text-slate-200 hover:bg-slate-700 rounded flex items-center gap-2"
+                  >
+                    <span>📧</span> Outlook
+                  </button>
+                  <button
+                    onClick={() => handleAddIntegration('teams')}
+                    className="w-full text-left px-3 py-2 text-xs text-slate-200 hover:bg-slate-700 rounded flex items-center gap-2"
+                  >
+                    <span>👥</span> Microsoft Teams
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">

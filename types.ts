@@ -8,6 +8,13 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
+export interface ChatSession {
+  id: string;
+  timestamp: string; // ISO string
+  summary?: string;
+  messages: ChatMessage[];
+}
+
 // Diary
 export type DiaryType = 'Reflection' | 'Decision' | 'Idea';
 
@@ -162,7 +169,7 @@ export interface Settings {
   integrations: IntegrationConfig[];
 }
 
-export type IntegrationType = 'google_calendar' | 'gmail' | 'slack' | 'notion' | 'linear' | 'github' | 'whatsapp' | 'custom';
+export type IntegrationType = 'google_calendar' | 'gmail' | 'slack' | 'notion' | 'linear' | 'github' | 'whatsapp' | 'zoho' | 'outlook' | 'teams' | 'custom';
 
 export interface IntegrationConfig {
   id: string;
