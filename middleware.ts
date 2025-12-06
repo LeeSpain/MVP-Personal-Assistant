@@ -5,12 +5,14 @@ import { NextRequest, NextFetchEvent } from "next/server";
 export default function middleware(req: NextRequest, event: NextFetchEvent) {
     if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
         console.error("Middleware Debug: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is MISSING");
+        return new Response(JSON.stringify({ error: "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is missing in Vercel Environment Variables" }), { status: 500, headers: { "content-type": "application/json" } });
     } else {
         console.log("Middleware Debug: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is SET");
     }
 
     if (!process.env.CLERK_SECRET_KEY) {
         console.error("Middleware Debug: CLERK_SECRET_KEY is MISSING");
+        return new Response(JSON.stringify({ error: "CLERK_SECRET_KEY is missing in Vercel Environment Variables" }), { status: 500, headers: { "content-type": "application/json" } });
     } else {
         console.log("Middleware Debug: CLERK_SECRET_KEY is SET");
     }
