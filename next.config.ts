@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
     },
 };
 
-console.log("Build-time debug: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is " + (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? "SET" : "NOT SET"));
+
 
 
 export default nextConfig;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { oauth2Client } from '@/lib/google';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@clerk/nextjs/server';
+import { getOrCreateDefaultUser } from '@/lib/user';
 import { google } from 'googleapis';
 
 export const dynamic = 'force-dynamic';
@@ -20,10 +20,7 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        const { userId } = await auth();
-        if (!userId) {
-            return new NextResponse("Unauthorized", { status: 401 });
-        }
+        const user = await getOrCreateDefaultUser();
 
         // Exchange code for tokens
         const { tokens } = await oauth2Client.getToken(code);
@@ -33,15 +30,6 @@ export async function GET(req: NextRequest) {
         const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
         const userInfo = await oauth2.userinfo.get();
         const email = userInfo.data.email;
-
-        // Find internal user
-        const user = await prisma.user.findUnique({
-            where: { clerkId: userId },
-        });
-
-        if (!user) {
-            return new NextResponse("User not found", { status: 404 });
-        }
 
         // Save tokens
         await prisma.integration.upsert({

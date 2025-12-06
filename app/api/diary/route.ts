@@ -1,24 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@clerk/nextjs/server';
+import { getOrCreateDefaultUser } from '@/lib/user';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-    const { userId } = await auth();
-    if (!userId) {
-        return new NextResponse("Unauthorized", { status: 401 });
-    }
+    const user = await getOrCreateDefaultUser();
 
     try {
-        const user = await prisma.user.findUnique({
-            where: { clerkId: userId },
-        });
-
-        if (!user) {
-            return NextResponse.json([]);
-        }
-
         const entries = await prisma.diaryEntry.findMany({
             where: { userId: user.id },
             orderBy: { createdAt: 'desc' },
@@ -32,22 +21,11 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-    const { userId } = await auth();
-    if (!userId) {
-        return new NextResponse("Unauthorized", { status: 401 });
-    }
+    const user = await getOrCreateDefaultUser();
 
     try {
         const body = await req.json();
         const { type, title, content } = body;
-
-        const user = await prisma.user.findUnique({
-            where: { clerkId: userId },
-        });
-
-        if (!user) {
-            return new NextResponse("User not found", { status: 404 });
-        }
 
         const entry = await prisma.diaryEntry.create({
             data: {

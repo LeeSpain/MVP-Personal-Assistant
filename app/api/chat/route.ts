@@ -1,30 +1,19 @@
 import { google } from '@ai-sdk/google';
 import { streamText, convertToCoreMessages, tool } from 'ai';
-import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 import { SYSTEM_PROMPT } from '../ai/chat/systemPrompt';
 import { generateEmbedding } from '@/lib/embeddings';
 import { cosineSimilarity } from '@/lib/math';
 import { z } from 'zod';
+import { getOrCreateDefaultUser } from '@/lib/user';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 export async function POST(req: Request) {
-    const { userId } = await auth();
-    if (!userId) {
-        return new Response("Unauthorized", { status: 401 });
-    }
+    const user = await getOrCreateDefaultUser();
 
     const { messages, context, sessionId } = await req.json();
-
-    const user = await prisma.user.findUnique({
-        where: { clerkId: userId },
-    });
-
-    if (!user) {
-        return new Response("User not found", { status: 404 });
-    }
 
     let currentSessionId = sessionId;
     if (!currentSessionId) {

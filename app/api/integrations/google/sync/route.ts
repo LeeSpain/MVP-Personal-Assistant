@@ -1,21 +1,15 @@
 import { NextResponse } from 'next/server';
 import { oauth2Client } from '@/lib/google';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@clerk/nextjs/server';
+import { getOrCreateDefaultUser } from '@/lib/user';
 import { google } from 'googleapis';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST() {
-    const { userId } = await auth();
-    if (!userId) {
-        return new NextResponse("Unauthorized", { status: 401 });
-    }
+    const user = await getOrCreateDefaultUser();
 
     try {
-        const user = await prisma.user.findUnique({ where: { clerkId: userId } });
-        if (!user) return new NextResponse("User not found", { status: 404 });
-
         // Get tokens
         const integration = await prisma.integration.findUnique({
             where: {

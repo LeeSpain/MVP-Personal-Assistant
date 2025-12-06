@@ -1,6 +1,5 @@
 import React from 'react';
 import { Mode } from '../types';
-import { UserButton, SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface TopbarProps {
@@ -55,8 +54,7 @@ export const Topbar: React.FC<TopbarProps> = ({
           <button
             key={mode}
             onClick={() => onModeChange(mode)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${currentMode === mode ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
-              }`}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${currentMode === mode ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
           >
             {getModeLabel(mode)}
           </button>
@@ -83,19 +81,6 @@ export const Topbar: React.FC<TopbarProps> = ({
         <button onClick={onOpenContacts} className="hidden md:inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">{t('nav.contacts')}</button>
         <button onClick={onOpenInsights} className="inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">{t('nav.insights')}</button>
         <button onClick={onOpenSettings} className="inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">{t('nav.settings')}</button>
-
-        <div className="ml-2 pl-2 border-l border-slate-800 flex items-center">
-          <SignedIn>
-            <UserButton afterSignOutUrl="/" />
-          </SignedIn>
-          <SignedOut>
-            <SignInButton mode="modal">
-              <button className="text-xs px-3 py-1.5 rounded-md bg-violet-600 text-white hover:bg-violet-500 transition-colors">
-                Sign In
-              </button>
-            </SignInButton>
-          </SignedOut>
-        </div>
       </div>
     </header>
   );

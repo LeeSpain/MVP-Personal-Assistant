@@ -1,27 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@clerk/nextjs/server';
+import { getOrCreateDefaultUser } from '@/lib/user';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-    const { userId } = await auth();
-    if (!userId) {
-        return new NextResponse("Unauthorized", { status: 401 });
-    }
+    const user = await getOrCreateDefaultUser();
 
     try {
-        // Find user by clerkId
-        const user = await prisma.user.findUnique({
-            where: { clerkId: userId },
-        });
-
-        if (!user) {
-            // Create user if not exists (lazy creation)
-            // In a real app, use webhooks. For MVP, this is a fallback.
-            return NextResponse.json([]);
-        }
-
         const meetings = await prisma.meeting.findMany({
             where: { userId: user.id },
             orderBy: { startTime: 'asc' },
@@ -35,29 +21,11 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-    const { userId } = await auth();
-    if (!userId) {
-        return new NextResponse("Unauthorized", { status: 401 });
-    }
+    const user = await getOrCreateDefaultUser();
 
     try {
         const body = await req.json();
         const { title, startTime, endTime, status, videoLink } = body;
-
-        // Ensure user exists
-        let user = await prisma.user.findUnique({
-            where: { clerkId: userId },
-        });
-
-        if (!user) {
-            // Create user on the fly if needed
-            user = await prisma.user.create({
-                data: {
-                    clerkId: userId,
-                    email: "placeholder@example.com", // Fallback
-                }
-            });
-        }
 
         let googleEventId = null;
         let finalVideoLink = videoLink;
