@@ -3,6 +3,8 @@ import { SYSTEM_PROMPT } from './systemPrompt';
 
 const apiKey = process.env.GEMINI_API_KEY;
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   if (!apiKey) {
     return NextResponse.json(
@@ -71,7 +73,7 @@ export async function POST(req: NextRequest) {
           contents: contents,
           generationConfig: {
             temperature: 0.7,
-            maxOutputTokens: 1000,
+            maxOutputTokens: 4000,
             responseMimeType: "application/json"
           }
         })

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@clerk/nextjs/server';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
     const { userId } = await auth();
     if (!userId) {
@@ -49,18 +51,55 @@ export async function POST(req: Request) {
 
         if (!user) {
             // Create user on the fly if needed
-            // Ideally, use Clerk webhooks for this
-            const userEmail = (await (await fetch(`https://api.clerk.com/v1/users/${userId}`, {
-                headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` }
-            })).json()).email_addresses[0].email_address; // Simplified fetch for MVP, might fail without key
-
             user = await prisma.user.create({
                 data: {
                     clerkId: userId,
-                    email: "placeholder@example.com", // Fallback if we can't get email easily without extra setup
+                    email: "placeholder@example.com", // Fallback
                 }
             });
         }
+
+        let googleEventId = null;
+        let finalVideoLink = videoLink;
+
+        // --- GOOGLE SYNC START ---
+        const integration = await prisma.integration.findUnique({
+            where: { userId_provider: { userId: user.id, provider: 'google' } }
+        });
+
+        if (integration && integration.accessToken) {
+            try {
+                const { google } = await import('googleapis');
+                const { oauth2Client } = await import('@/lib/google');
+
+                oauth2Client.setCredentials({
+                    access_token: integration.accessToken,
+                    refresh_token: integration.refreshToken || undefined,
+                });
+
+                const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+                const event = {
+                    summary: title,
+                    start: { dateTime: new Date(startTime).toISOString() },
+                    end: { dateTime: endTime ? new Date(endTime).toISOString() : new Date(new Date(startTime).getTime() + 30 * 60000).toISOString() }, // Default 30 min
+                };
+
+                const gRes = await calendar.events.insert({
+                    calendarId: 'primary',
+                    requestBody: event,
+                });
+
+                googleEventId = gRes.data.id;
+                if (gRes.data.hangoutLink) {
+                    finalVideoLink = gRes.data.hangoutLink;
+                }
+            } catch (gError) {
+                console.error("Failed to push to Google Calendar", gError);
+                // Don't fail the whole request, just log it
+            }
+        }
+        // --- GOOGLE SYNC END ---
 
         const meeting = await prisma.meeting.create({
             data: {
@@ -69,7 +108,8 @@ export async function POST(req: Request) {
                 startTime: new Date(startTime),
                 endTime: endTime ? new Date(endTime) : null,
                 status: status || 'pending',
-                videoLink,
+                videoLink: finalVideoLink,
+                googleEventId,
             },
         });
 

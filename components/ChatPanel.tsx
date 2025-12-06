@@ -13,6 +13,7 @@ interface ChatPanelProps {
   voiceOutputEnabled: boolean;
   onToggleVoiceOutput: () => void;
   onOpenHistory?: () => void;
+  onOpenVoiceMode?: () => void;
   isProcessing: boolean;
 }
 
@@ -23,6 +24,7 @@ export default function ChatPanel({
   voiceOutputEnabled,
   onToggleVoiceOutput,
   onOpenHistory,
+  onOpenVoiceMode,
   isProcessing
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
@@ -64,10 +66,15 @@ export default function ChatPanel({
   }
 
   const handleMicClick = () => {
-    if (isListening) {
-      stopListening();
+    if (onOpenVoiceMode) {
+      onOpenVoiceMode();
     } else {
-      startListening();
+      // Fallback to old behavior if prop not provided (though it should be)
+      if (isListening) {
+        stopListening();
+      } else {
+        startListening();
+      }
     }
   };
 

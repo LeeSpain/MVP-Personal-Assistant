@@ -169,7 +169,7 @@ export interface Settings {
   integrations: IntegrationConfig[];
 }
 
-export type IntegrationType = 'google_calendar' | 'gmail' | 'slack' | 'notion' | 'linear' | 'github' | 'whatsapp' | 'zoho' | 'outlook' | 'teams' | 'custom';
+export type IntegrationType = 'google' | 'gmail' | 'slack' | 'notion' | 'linear' | 'github' | 'whatsapp' | 'zoho' | 'outlook' | 'teams' | 'custom';
 
 export interface IntegrationConfig {
   id: string;

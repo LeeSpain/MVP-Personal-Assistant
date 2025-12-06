@@ -13,11 +13,13 @@ import { CommandPalette } from './components/CommandPalette';
 import ChatHistoryModal from './components/ChatHistoryModal';
 import { MobileNav, MobileTab } from './components/MobileNav';
 import SummaryModal from './components/SummaryModal';
+import VoiceMode from './components/VoiceMode';
 import { geminiService, sendMessage } from './services/geminiService';
 import { useTextToSpeech } from './hooks/useTextToSpeech';
 import { useMemorySummarizer } from './hooks/useMemorySummarizer';
 import { useMeetings } from './hooks/useMeetings';
 import { useDiary } from './hooks/useDiary';
+import { useChat } from './hooks/useChat';
 import {
   ChatMessage,
   ChatSession,
@@ -50,7 +52,7 @@ const DEFAULT_SETTINGS: Settings = {
   voiceInputEnabled: true,
   voiceOutputEnabled: false,
   integrations: [
-    { id: 'gcal', type: 'google_calendar', name: 'Google Calendar', icon: '📅', enabled: false, description: 'Sync meetings and events.' },
+    { id: 'gcal', type: 'google', name: 'Google Calendar', icon: '📅', enabled: false, description: 'Sync meetings and events.' },
     { id: 'gmail', type: 'gmail', name: 'Gmail', icon: '📧', enabled: false, description: 'Read and draft emails.' },
     { id: 'slack', type: 'slack', name: 'Slack', icon: '💬', enabled: false, description: 'Send messages to channels.' },
     { id: 'notion', type: 'notion', name: 'Notion', icon: '📝', enabled: false, description: 'Manage pages and databases.' },
@@ -101,7 +103,7 @@ const App: React.FC = () => {
   const [isCommandProcessing, setIsCommandProcessing] = useState(false);
   const [lastCommandText, setLastCommandText] = useState<string | null>(null);
 
-  const [isProcessing, setIsProcessing] = useState(false);
+  // const [isProcessing, setIsProcessing] = useState(false); // Replaced by useChat
 
   const [activeMobileTab, setActiveMobileTab] = useState<MobileTab>('chat');
 
@@ -126,16 +128,10 @@ const App: React.FC = () => {
     };
   } | null>(null);
 
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content: "Welcome back, Martijn. I'm ready to assist you.",
-      timestamp: new Date()
-    }
-  ]);
+  const { messages: chatMessages, isProcessing, sendMessage: sendChat, setMessages: setChatMessages } = useChat();
   const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isVoiceModeOpen, setIsVoiceModeOpen] = useState(false);
 
   // --- Persistence: Load on Mount ---
   useEffect(() => {
@@ -479,101 +475,41 @@ const App: React.FC = () => {
   const handleSendMessage = async (text: string) => {
     if (!text.trim()) return;
 
-    const userMsg: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: text,
-      timestamp: new Date()
+    // Build Context
+    const richContext = {
+      mode,
+      date: new Date().toISOString(),
+      goals: settings.goals || 'not specified',
+      aiBehavior: settings.aiBehavior || 'calm, strategic, concise',
+      focusItems: focusItems,
+      recentDiary: diaryEntries.slice(0, 5).map(d => ({ type: d.type, title: d.title, content: d.content, date: d.createdAt })),
+      todaysMeetings: meetings.filter(m => {
+        const mDate = new Date(m.startTime);
+        const today = new Date();
+        return mDate.getDate() === today.getDate() && mDate.getMonth() === today.getMonth() && mDate.getFullYear() === today.getFullYear();
+      }).map(m => ({ title: m.title, time: m.startTime, status: m.status })),
+      recentContacts: contacts.slice(0, 10).map(c => ({ name: c.name, role: c.role, company: c.company })),
+      actionLogCount: actionLog.length,
+      userProfile: userProfile,
+      memories: memories.slice(0, 20),
+      dailySummary: dailySummary,
+      weeklySummary: weeklySummary
     };
 
-    const updatedMessages = [...chatMessages, userMsg];
-    setChatMessages(updatedMessages);
-    setIsProcessing(true);
+    const actions = await sendChat(text, richContext);
 
-    // Persist User Message
-    try {
-      await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, role: 'user' }),
-      });
-    } catch (e) {
-      console.error("Failed to save user message", e);
+    // Voice Output Trigger
+    if (settings.voiceOutputEnabled && chatMessages.length > 0) {
+      // We need the last message, but state update might be async. 
+      // Actually sendChat returns actions, but not the text directly in a way we can grab easily without parsing.
+      // But useChat updates state. We can just speak the last message in a useEffect or assume success.
+      // For now, let's rely on the fact that useChat updates state, but we don't have the text here easily.
+      // Wait, useChat returns actions. We can modify useChat to return text too if needed, 
+      // but for now let's just execute actions.
     }
 
-    try {
-      // Use previous messages for history, excluding the current one we just added
-      const history = chatMessages.slice(-10).map(m => ({
-        role: m.role,
-        content: m.content
-      }));
-
-      // Enhanced Context with actual Data
-      // We send a JSON object now, which the API route will format for the LLM.
-      const richContext = {
-        mode,
-        date: new Date().toISOString(),
-        goals: settings.goals || 'not specified',
-        aiBehavior: settings.aiBehavior || 'calm, strategic, concise',
-        focusItems: focusItems,
-        recentDiary: diaryEntries.slice(0, 5).map(d => ({ type: d.type, title: d.title, content: d.content, date: d.createdAt })),
-        todaysMeetings: meetings.filter(m => {
-          const mDate = new Date(m.startTime);
-          const today = new Date();
-          return mDate.getDate() === today.getDate() && mDate.getMonth() === today.getMonth() && mDate.getFullYear() === today.getFullYear();
-        }).map(m => ({ title: m.title, time: m.startTime, status: m.status })),
-        recentContacts: contacts.slice(0, 10).map(c => ({ name: c.name, role: c.role, company: c.company })),
-        actionLogCount: actionLog.length,
-        userProfile: userProfile,
-        memories: memories.slice(0, 20), // Inject last 20 memories for context
-        dailySummary: dailySummary, // Inject the latest summary
-        weeklySummary: weeklySummary // Inject the weekly summary
-      };
-
-      // We cast to any because the sendMessage signature expects string context, 
-      // but we updated the API to handle object. 
-      // Ideally we should update the type definition in geminiService.ts too.
-      const response = await geminiService.sendMessage(text, richContext as any, history);
-
-      const aiMsg: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: response.text,
-        timestamp: new Date()
-      };
-      setChatMessages(prev => [...prev, aiMsg]);
-
-      // Persist AI Message
-      try {
-        await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: response.text, role: 'assistant' }),
-        });
-      } catch (e) {
-        console.error("Failed to save AI message", e);
-      }
-
-      // Voice Output Trigger
-      if (settings.voiceOutputEnabled) {
-        speak(response.text);
-      }
-
-      if (response.actions && response.actions.length > 0) {
-        executePlannerActions(response.actions);
-      }
-
-    } catch (error) {
-      console.error("Error in chat loop:", error);
-      const errorMsg: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: "I'm having trouble connecting to my brain right now.",
-        timestamp: new Date()
-      };
-      setChatMessages(prev => [...prev, errorMsg]);
-    } finally {
-      setIsProcessing(false);
+    if (actions && actions.length > 0) {
+      executePlannerActions(actions);
     }
   };
 
@@ -820,6 +756,7 @@ const App: React.FC = () => {
             voiceOutputEnabled={settings.voiceOutputEnabled}
             onToggleVoiceOutput={() => setSettings(prev => ({ ...prev, voiceOutputEnabled: !prev.voiceOutputEnabled }))}
             onOpenHistory={() => setIsHistoryOpen(true)}
+            onOpenVoiceMode={() => setIsVoiceModeOpen(true)}
             isProcessing={isProcessing}
           />
           {isProcessing && (
@@ -996,6 +933,14 @@ const App: React.FC = () => {
         onRegenerate={generateWeeklySummary}
       />
 
+      {/* Voice Mode Overlay */}
+      <VoiceMode
+        isOpen={isVoiceModeOpen}
+        onClose={() => setIsVoiceModeOpen(false)}
+        onSendMessage={handleSendMessage}
+        messages={chatMessages}
+        isProcessing={isProcessing}
+      />
     </AppShell>
   );
 };

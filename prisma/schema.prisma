@@ -3,10 +3,12 @@
 
 generator client {
   provider = "prisma-client-js"
+  engineType = "library"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -30,7 +32,11 @@ model User {
   diaryEntries  DiaryEntry[]
   chatSessions  ChatSession[]
   contacts      Contact[]
+
   notifications Notification[]
+
+  memories      Memory[]
+  integrations  Integration[]
 }
 
 model Meeting {
@@ -43,10 +49,14 @@ model Meeting {
   startTime   DateTime
   endTime     DateTime?
   status      String   @default("pending") // pending, confirmed, cancelled
+
   videoLink   String?
+  googleEventId String?
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model DiaryEntry {
@@ -60,6 +70,8 @@ model DiaryEntry {
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model ChatSession {
@@ -72,6 +84,8 @@ model ChatSession {
   updatedAt DateTime      @updatedAt
   
   messages  ChatMessage[]
+
+  @@index([userId])
 }
 
 model ChatMessage {
@@ -82,6 +96,8 @@ model ChatMessage {
   role      String      // user, assistant
   content   String      @db.Text
   timestamp DateTime    @default(now())
+
+  @@index([sessionId])
 }
 
 model Contact {
@@ -105,6 +121,8 @@ model Contact {
   
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Notification {
@@ -116,4 +134,43 @@ model Notification {
   read      Boolean  @default(false)
   
   createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Memory {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  content   String   @db.Text
+  type      String   // fact, preference, context
+  tags      String[]
+  
+  // Vector embedding (stored as array of floats)
+  embedding Float[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+
+model Integration {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  provider     String   // "google"
+  accessToken  String?  @db.Text
+  refreshToken String?  @db.Text
+  expiresAt    BigInt?
+  email        String?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, provider])
+  @@index([userId])
 }
