@@ -58,8 +58,8 @@ const AppShell: React.FC<AppShellProps> = ({
         />
       </div>
 
-      <main className="flex-1 min-h-0 overflow-hidden p-2 lg:p-6 relative z-0">
-        <div className="h-full w-full max-w-[1920px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <main className="flex-1 min-h-0 overflow-hidden p-2 lg:p-6 relative z-0 pb-[80px] lg:pb-6">
+        <div className="h-full w-full max-w-[1920px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
           {children}
         </div>
       </main>

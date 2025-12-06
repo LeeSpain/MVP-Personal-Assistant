@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Card from './Card';
-import { MonthView, WeekView } from './CalendarViews';
+import { MonthView, WeekView, ListView } from './CalendarViews';
 import { Meeting } from '../types';
 import { addMonths, subMonths, addWeeks, subWeeks, format, isSameDay } from 'date-fns';
 import DayDetailModal from './DayDetailModal';
@@ -17,7 +17,7 @@ export default function CalendarPanel({
     onDeleteMeeting
 }: CalendarPanelProps) {
     const [currentDate, setCurrentDate] = useState(new Date());
-    const [view, setView] = useState<'month' | 'week'>('month');
+    const [view, setView] = useState<'month' | 'week' | 'list'>('month');
     const [selectedDay, setSelectedDay] = useState<Date | null>(null);
 
     const handlePrev = () => {
@@ -71,6 +71,12 @@ export default function CalendarPanel({
                         >
                             Week
                         </button>
+                        <button
+                            onClick={() => setView('list')}
+                            className={`px-2 py-1 text-[10px] rounded-md transition-colors ${view === 'list' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                        >
+                            List
+                        </button>
                     </div>
                 </div>
 
@@ -84,8 +90,16 @@ export default function CalendarPanel({
                             onDelete={onDeleteMeeting}
                             onDayClick={handleDayClick}
                         />
-                    ) : (
+                    ) : view === 'week' ? (
                         <WeekView
+                            currentDate={currentDate}
+                            meetings={meetings}
+                            onUpdateStatus={onUpdateMeetingStatus}
+                            onDelete={onDeleteMeeting}
+                            onDayClick={handleDayClick}
+                        />
+                    ) : (
+                        <ListView
                             currentDate={currentDate}
                             meetings={meetings}
                             onUpdateStatus={onUpdateMeetingStatus}

@@ -195,3 +195,49 @@ export const WeekView: React.FC<CalendarViewProps> = ({ currentDate, meetings, o
         </div>
     );
 };
+
+// --- List View (Mobile Optimized) ---
+export const ListView: React.FC<CalendarViewProps> = ({ currentDate, meetings, onUpdateStatus, onDelete, onDayClick }) => {
+    const monthStart = startOfMonth(currentDate);
+    const monthEnd = endOfMonth(monthStart);
+    const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+
+    return (
+        <div className="flex flex-col h-full overflow-y-auto custom-scrollbar">
+            {days.map(day => {
+                const dayMeetings = meetings.filter(m => isSameDay(new Date(m.startTime), day));
+                if (dayMeetings.length === 0) return null;
+
+                const isToday = isSameDay(day, new Date());
+
+                return (
+                    <div key={day.toString()} className="mb-4 px-4">
+                        <div className={`text-xs font-bold uppercase mb-2 sticky top-0 bg-slate-900/95 backdrop-blur py-2 z-10 ${isToday ? 'text-violet-400' : 'text-slate-500'}`}>
+                            {format(day, 'EEEE, MMMM d')}
+                        </div>
+                        <div className="space-y-2">
+                            {dayMeetings.map(meeting => (
+                                <div key={meeting.id} className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50 flex items-center justify-between">
+                                    <div>
+                                        <div className="text-sm font-medium text-slate-200">{meeting.title}</div>
+                                        <div className="text-xs text-slate-500 flex items-center gap-2">
+                                            <span>{format(new Date(meeting.startTime), 'h:mm a')}</span>
+                                            {meeting.status === 'cancelled' && <span className="text-red-400">(Cancelled)</span>}
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {meeting.status !== 'confirmed' && (
+                                            <button onClick={() => onUpdateStatus(meeting.id, 'confirmed')} className="p-2 bg-slate-700 rounded-full text-green-400">✓</button>
+                                        )}
+                                        <button onClick={() => onDelete(meeting.id)} className="p-2 bg-slate-700 rounded-full text-red-400">🗑</button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            })}
+            <div className="h-20"></div> {/* Spacer for bottom nav */}
+        </div>
+    );
+};

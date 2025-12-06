@@ -738,9 +738,10 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* DESKTOP LAYOUT (Grid) */}
-      <div className="hidden lg:contents">
-        <section className="col-span-3 h-full min-h-0">
+      {/* DESKTOP & TABLET LAYOUT (Grid) */}
+      <div className="hidden md:contents">
+        {/* Diary - Hidden on Tablet, Visible on Desktop */}
+        <section className="hidden lg:block lg:col-span-3 h-full min-h-0">
           <DiaryPanel
             entries={diaryEntries}
             onAddEntry={handleAddDiaryEntry}
@@ -748,7 +749,8 @@ const App: React.FC = () => {
           />
         </section>
 
-        <section className="col-span-6 h-full min-h-0">
+        {/* Chat - Takes half width on Tablet, center on Desktop */}
+        <section className="col-span-1 md:col-span-1 lg:col-span-6 h-full min-h-0 relative">
           <ChatPanel
             messages={chatMessages}
             onSendMessage={handleSendMessage}
@@ -769,7 +771,8 @@ const App: React.FC = () => {
           </div>
         </section>
 
-        <section className="col-span-3 h-full min-h-0 flex flex-col gap-4">
+        {/* Tools - Right column on Tablet & Desktop */}
+        <section className="col-span-1 md:col-span-1 lg:col-span-3 h-full min-h-0 flex flex-col gap-4">
           <div className="flex-1 min-h-0">
             <TodayPanel
               meetings={meetings}
@@ -793,8 +796,8 @@ const App: React.FC = () => {
         </section>
       </div>
 
-      {/* MOBILE LAYOUT (Tabs) */}
-      <div className="lg:hidden h-full flex flex-col min-h-0">
+      {/* MOBILE LAYOUT (Tabs) - Visible only on small screens */}
+      <div className="md:hidden h-full flex flex-col min-h-0">
         {activeMobileTab === 'diary' && (
           <DiaryPanel
             entries={diaryEntries}
