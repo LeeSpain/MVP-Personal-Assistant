@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import AudioVisualizer from './AudioVisualizer';
 import { ChatMessage } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface VoiceModeProps {
     isOpen: boolean;
@@ -11,10 +12,11 @@ interface VoiceModeProps {
 }
 
 export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, isProcessing }: VoiceModeProps) {
+    const { t, language } = useLanguage();
     const [isListening, setIsListening] = useState(false);
     const [transcript, setTranscript] = useState('');
     const [stream, setStream] = useState<MediaStream | null>(null);
-    const [status, setStatus] = useState('Idle'); // Idle, Listening, Thinking, Speaking
+    const [status, setStatus] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
 
     const recognitionRef = useRef<any>(null);
     const synthRef = useRef<SpeechSynthesis | null>(null);
@@ -29,11 +31,11 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
                 const recognition = new SpeechRecognition();
                 recognition.continuous = false; // Stop after one sentence for turn-taking
                 recognition.interimResults = true;
-                recognition.lang = 'en-US';
+                recognition.lang = language === 'nl' ? 'nl-NL' : 'en-US';
 
                 recognition.onstart = () => {
                     setIsListening(true);
-                    setStatus('Listening...');
+                    setStatus('listening');
                 };
 
                 recognition.onresult = (event: any) => {
@@ -56,7 +58,7 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
             // TTS
             synthRef.current = window.speechSynthesis;
         }
-    }, []);
+    }, [language]);
 
     // 2. Handle Microphone Stream for Visualizer
     useEffect(() => {
@@ -72,7 +74,7 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
 
     // 3. Auto-start listening when open (or after speaking)
     useEffect(() => {
-        if (isOpen && !isProcessing && status === 'Idle' && recognitionRef.current && !isListening) {
+        if (isOpen && !isProcessing && status === 'idle' && recognitionRef.current && !isListening) {
             try {
                 recognitionRef.current.start();
             } catch (e) {
@@ -83,9 +85,9 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
 
     // 4. Handle Sending Message
     useEffect(() => {
-        if (!isListening && transcript && status !== 'Thinking') {
+        if (!isListening && transcript && status !== 'thinking') {
             // Recognition ended and we have text
-            setStatus('Thinking');
+            setStatus('thinking');
             onSendMessage(transcript).then(() => {
                 setTranscript('');
             });
@@ -97,13 +99,14 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
         const lastMsg = messages[messages.length - 1];
         if (lastMsg && lastMsg.role === 'assistant' && lastMsg.id !== lastMessageIdRef.current) {
             lastMessageIdRef.current = lastMsg.id;
-            setStatus('Speaking');
+            setStatus('speaking');
 
             // Speak
             if (synthRef.current) {
                 const utterance = new SpeechSynthesisUtterance(lastMsg.content);
+                utterance.lang = language === 'nl' ? 'nl-NL' : 'en-US';
                 utterance.onend = () => {
-                    setStatus('Idle'); // Go back to listening
+                    setStatus('idle'); // Go back to listening
                 };
                 synthRef.current.speak(utterance);
             }
@@ -128,7 +131,7 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
             {/* Status Text */}
             <div className="mb-12 text-center space-y-2">
                 <h2 className="text-2xl font-light text-slate-100 tracking-wider uppercase">
-                    {status}
+                    {t(`voice.${status}` as any)}
                 </h2>
                 {transcript && (
                     <p className="text-slate-400 text-lg italic max-w-md mx-auto">
@@ -140,12 +143,12 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
             {/* Visualizer */}
             <div className="w-64 h-64 relative flex items-center justify-center">
                 {/* Glow Effect */}
-                <div className={`absolute inset-0 bg-violet-500 rounded-full blur-3xl opacity-20 transition-opacity duration-500 ${status === 'Speaking' ? 'opacity-40' : ''}`}></div>
+                <div className={`absolute inset-0 bg-violet-500 rounded-full blur-3xl opacity-20 transition-opacity duration-500 ${status === 'speaking' ? 'opacity-40' : ''}`}></div>
 
                 <AudioVisualizer
                     stream={stream}
                     isActive={true}
-                    color={status === 'Speaking' ? '#34d399' : '#8b5cf6'} // Green for AI, Violet for User
+                    color={status === 'speaking' ? '#34d399' : '#8b5cf6'} // Green for AI, Violet for User
                 />
             </div>
 

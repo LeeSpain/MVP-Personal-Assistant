@@ -1,5 +1,6 @@
 import React from 'react';
 import { BookOpen, MessageSquare, Sun, Calendar } from 'lucide-react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export type MobileTab = 'diary' | 'chat' | 'today' | 'calendar';
 
@@ -9,11 +10,12 @@ interface MobileNavProps {
 }
 
 export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, onTabChange }) => {
+  const { t } = useLanguage();
   const tabs: { id: MobileTab; label: string; icon: React.ElementType }[] = [
-    { id: 'diary', label: 'Diary', icon: BookOpen },
-    { id: 'chat', label: 'Chat', icon: MessageSquare },
-    { id: 'today', label: 'Today', icon: Sun },
-    { id: 'calendar', label: 'Calendar', icon: Calendar },
+    { id: 'diary', label: t('nav.diary'), icon: BookOpen },
+    { id: 'chat', label: t('nav.chat'), icon: MessageSquare },
+    { id: 'today', label: t('nav.today'), icon: Sun },
+    { id: 'calendar', label: t('nav.calendar'), icon: Calendar },
   ];
 
   return (

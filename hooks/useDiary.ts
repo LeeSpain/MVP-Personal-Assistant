@@ -47,9 +47,15 @@ export function useDiary() {
     };
 
     const deleteDiaryEntry = async (id: string) => {
+        // Optimistic update
         setDiaryEntries(prev => prev.filter(e => e.id !== id));
-        // TODO: Implement actual API call
-        // await fetch(`/api/diary/${id}`, { method: 'DELETE' });
+        try {
+            const res = await fetch(`/api/diary/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Failed to delete diary entry');
+        } catch (err) {
+            console.error(err);
+            fetchDiary(); // Re-sync
+        }
     };
 
     return { diaryEntries, isLoading, error, addDiaryEntry, deleteDiaryEntry, refresh: fetchDiary };

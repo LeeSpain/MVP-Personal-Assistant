@@ -33,8 +33,11 @@ export async function POST(req: NextRequest) {
 - **AI Behavior**: ${context.aiBehavior}
 - **User Profile**: ${JSON.stringify(context.userProfile)}
 - **Memories**: ${JSON.stringify(context.memories)}
+- **Language**: ${context.language === 'nl' ? 'Dutch (Nederlands)' : 'English'}
 - **Daily Summary**: ${context.dailySummary || "None yet"}
 - **Weekly Summary**: ${context.weeklySummary || "None yet"}
+
+IMPORTANT: You MUST respond in ${context.language === 'nl' ? 'Dutch (Nederlands)' : 'English'}.
       `;
     } else {
       contextString = `Context: ${context}`;

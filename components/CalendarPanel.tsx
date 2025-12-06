@@ -3,7 +3,9 @@ import Card from './Card';
 import { MonthView, WeekView, ListView } from './CalendarViews';
 import { Meeting } from '../types';
 import { addMonths, subMonths, addWeeks, subWeeks, format, isSameDay } from 'date-fns';
+import { nl, enUS } from 'date-fns/locale';
 import DayDetailModal from './DayDetailModal';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface CalendarPanelProps {
     meetings: Meeting[];
@@ -19,6 +21,8 @@ export default function CalendarPanel({
     const [currentDate, setCurrentDate] = useState(new Date());
     const [view, setView] = useState<'month' | 'week' | 'list'>('month');
     const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+    const { t, language } = useLanguage();
+    const locale = language === 'nl' ? nl : enUS;
 
     const handlePrev = () => {
         if (view === 'month') {
@@ -45,16 +49,16 @@ export default function CalendarPanel({
     };
 
     return (
-        <Card title="Calendar">
+        <Card title={t('calendar.title')}>
             <div className="flex flex-col h-full">
                 {/* Toolbar */}
                 <div className="flex justify-between items-center mb-4 px-1">
                     <div className="flex items-center gap-1">
                         <button onClick={handlePrev} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white">◀</button>
-                        <button onClick={handleToday} className="text-[10px] font-semibold px-2 py-1 bg-slate-800 rounded hover:bg-slate-700 text-slate-200">Today</button>
+                        <button onClick={handleToday} className="text-[10px] font-semibold px-2 py-1 bg-slate-800 rounded hover:bg-slate-700 text-slate-200">{t('common.today')}</button>
                         <button onClick={handleNext} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white">▶</button>
                         <span className="text-xs font-bold text-slate-200 ml-1 truncate max-w-[100px] sm:max-w-none">
-                            {format(currentDate, view === 'month' ? 'MMMM yyyy' : "'Week of' MMM d")}
+                            {format(currentDate, view === 'month' ? 'MMMM yyyy' : "'Week of' MMM d", { locale })}
                         </span>
                     </div>
 
@@ -63,19 +67,19 @@ export default function CalendarPanel({
                             onClick={() => setView('month')}
                             className={`px-2 py-1 text-[10px] rounded-md transition-colors ${view === 'month' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
                         >
-                            Month
+                            {t('calendar.month')}
                         </button>
                         <button
                             onClick={() => setView('week')}
                             className={`px-2 py-1 text-[10px] rounded-md transition-colors ${view === 'week' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
                         >
-                            Week
+                            {t('calendar.week')}
                         </button>
                         <button
                             onClick={() => setView('list')}
                             className={`px-2 py-1 text-[10px] rounded-md transition-colors ${view === 'list' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
                         >
-                            List
+                            {t('calendar.list')}
                         </button>
                     </div>
                 </div>

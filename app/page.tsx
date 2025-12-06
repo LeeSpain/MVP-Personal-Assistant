@@ -1,7 +1,12 @@
 "use client";
 
 import App from "../App";
+import { LanguageProvider } from "../contexts/LanguageContext";
 
 export default function HomePage() {
-  return <App />;
+  return (
+    <LanguageProvider>
+      <App />
+    </LanguageProvider>
+  );
 }

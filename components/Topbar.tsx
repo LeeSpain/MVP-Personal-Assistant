@@ -1,6 +1,7 @@
 import React from 'react';
 import { Mode } from '../types';
 import { UserButton, SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface TopbarProps {
   currentMode: Mode;
@@ -27,6 +28,18 @@ export const Topbar: React.FC<TopbarProps> = ({
   onGenerateWeeklySummary,
   isSummarizing
 }) => {
+  const { t } = useLanguage();
+
+  const getModeLabel = (mode: Mode) => {
+    switch (mode) {
+      case 'Deep Work': return t('modes.deepWork');
+      case 'Execution': return t('modes.execution');
+      case 'Relationship': return t('modes.relationship');
+      case 'Recovery': return t('modes.recovery');
+      default: return mode;
+    }
+  };
+
   return (
     <header className="h-16 border-b border-slate-800 bg-slate-900/80 backdrop-blur px-4 lg:px-6 flex items-center justify-between shrink-0 z-20">
       <div className="flex items-center gap-3">
@@ -45,7 +58,7 @@ export const Topbar: React.FC<TopbarProps> = ({
             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${currentMode === mode ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
               }`}
           >
-            {mode}
+            {getModeLabel(mode)}
           </button>
         ))}
       </div>
@@ -66,10 +79,10 @@ export const Topbar: React.FC<TopbarProps> = ({
           {isSummarizing ? '...' : 'Week'}
         </button>
         <div className="w-px h-6 bg-slate-800 mx-1"></div>
-        <button onClick={onOpenCommandPalette} className="hidden md:inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">Command</button>
-        <button onClick={onOpenContacts} className="hidden md:inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">Contacts</button>
-        <button onClick={onOpenInsights} className="inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">Insights</button>
-        <button onClick={onOpenSettings} className="inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">Settings</button>
+        <button onClick={onOpenCommandPalette} className="hidden md:inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">{t('nav.command')}</button>
+        <button onClick={onOpenContacts} className="hidden md:inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">{t('nav.contacts')}</button>
+        <button onClick={onOpenInsights} className="inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">{t('nav.insights')}</button>
+        <button onClick={onOpenSettings} className="inline-flex items-center text-xs px-3 py-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">{t('nav.settings')}</button>
 
         <div className="ml-2 pl-2 border-l border-slate-800 flex items-center">
           <SignedIn>

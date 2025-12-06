@@ -5,6 +5,7 @@ import { FormEvent, useState, useRef, useEffect } from "react";
 import Card from "./Card";
 import { ChatMessage } from "../types";
 import { useSpeechRecognition } from "../hooks/useSpeechRecognition";
+import { useLanguage } from "../contexts/LanguageContext";
 
 interface ChatPanelProps {
   messages: ChatMessage[];
@@ -27,6 +28,7 @@ export default function ChatPanel({
   onOpenVoiceMode,
   isProcessing
 }: ChatPanelProps) {
+  const { t } = useLanguage();
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -79,7 +81,7 @@ export default function ChatPanel({
   };
 
   return (
-    <Card title="Chat" className="relative">
+    <Card title={t('nav.chat')} className="relative">
       <div className="absolute top-0 right-0 z-10 flex gap-2">
         {onOpenHistory && (
           <button
@@ -119,7 +121,7 @@ export default function ChatPanel({
           </div>
         ))}
         {isProcessing && (
-          <div className="text-xs text-slate-400 animate-pulse">Thinking…</div>
+          <div className="text-xs text-slate-400 animate-pulse">{t('chat.thinking')}</div>
         )}
         <div ref={messagesEndRef} />
       </div>
@@ -153,7 +155,7 @@ export default function ChatPanel({
 
         <input
           className="flex-1 rounded-full bg-slate-900/80 px-3 py-2 text-sm outline-none ring-0 focus:ring-1 focus:ring-violet-500/50 transition-all placeholder:text-slate-600 text-slate-200"
-          placeholder={isListening ? "Listening..." : "Type a message..."}
+          placeholder={isListening ? t('chat.listening') : t('chat.placeholder')}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={isProcessing}
@@ -171,7 +173,7 @@ export default function ChatPanel({
       <div className="mt-2 px-2 text-[10px] text-slate-500 text-center shrink-0">
         <span className="opacity-70">Try saying: </span>
         <span className="italic text-slate-400">
-          "{['Create a deep work block tomorrow for ICE Alarm', 'Switch me to Recovery mode', 'Plan my week based on my goals', 'Add a focus item to call John'][Math.floor(Math.random() * 4)]}"
+          "{t('chat.hints')[Math.floor(Math.random() * 4)]}"
         </span>
       </div>
     </Card>

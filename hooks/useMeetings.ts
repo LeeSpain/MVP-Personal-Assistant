@@ -51,19 +51,34 @@ export function useMeetings() {
     };
 
     const updateMeetingStatus = async (id: string, status: Meeting['status']) => {
-        // For MVP, we might not have a specific PATCH endpoint yet, 
-        // but we can assume we'd add one or just re-create/update.
-        // Let's implement a simple optimistic update for now
+        // Optimistic update
         setMeetings(prev => prev.map(m => m.id === id ? { ...m, status } : m));
 
-        // TODO: Implement actual API call
-        // await fetch(`/api/meetings/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+        try {
+            const res = await fetch(`/api/meetings/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+            if (!res.ok) throw new Error('Failed to update meeting status');
+        } catch (err) {
+            console.error(err);
+            // Revert on error? For MVP, just log.
+            fetchMeetings(); // Re-sync
+        }
     };
 
     const deleteMeeting = async (id: string) => {
+        // Optimistic update
         setMeetings(prev => prev.filter(m => m.id !== id));
-        // TODO: Implement actual API call
-        // await fetch(`/api/meetings/${id}`, { method: 'DELETE' });
+
+        try {
+            const res = await fetch(`/api/meetings/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Failed to delete meeting');
+        } catch (err) {
+            console.error(err);
+            fetchMeetings(); // Re-sync
+        }
     };
 
     return { meetings, isLoading, error, addMeeting, updateMeetingStatus, deleteMeeting, refresh: fetchMeetings };

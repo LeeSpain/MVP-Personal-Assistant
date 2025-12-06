@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Contact, Channel } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface ContactsPanelProps {
   contacts: Contact[];
@@ -16,6 +17,7 @@ export const ContactsPanel: React.FC<ContactsPanelProps> = ({
   onClose,
   onSimulateMessage,
 }) => {
+  const { t } = useLanguage();
   const [localContacts, setLocalContacts] = useState<Contact[]>(contacts);
   const [filter, setFilter] = useState<string>('');
 
@@ -58,7 +60,7 @@ export const ContactsPanel: React.FC<ContactsPanelProps> = ({
       <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col border border-slate-800 overflow-hidden text-slate-200">
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between shrink-0">
-          <h2 className="text-sm font-semibold text-white">Contacts</h2>
+          <h2 className="text-sm font-semibold text-white">{t('contacts.title')}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
               <path fillRule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clipRule="evenodd" />
@@ -69,20 +71,20 @@ export const ContactsPanel: React.FC<ContactsPanelProps> = ({
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 bg-slate-950/50">
           <div className="mb-4 flex gap-2">
-            <input 
+            <input
               className="flex-1 px-4 py-2 rounded-lg border border-slate-700 bg-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-              placeholder="Search contacts..."
+              placeholder={t('contacts.search')}
               value={filter}
               onChange={e => setFilter(e.target.value)}
             />
             <button onClick={handleAddContact} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-500">
-              Add Contact
+              {t('contacts.add')}
             </button>
           </div>
 
           <div className="space-y-3">
             {filteredContacts.length === 0 && (
-              <div className="text-center text-slate-500 text-sm py-8">No contacts found.</div>
+              <div className="text-center text-slate-500 text-sm py-8">{t('contacts.empty')}</div>
             )}
             {filteredContacts.map(contact => (
               <div key={contact.id} className="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-sm flex flex-col gap-3">
@@ -120,11 +122,11 @@ export const ContactsPanel: React.FC<ContactsPanelProps> = ({
                 </div>
                 {onSimulateMessage && (
                   <div className="flex justify-end">
-                    <button 
+                    <button
                       onClick={() => onSimulateMessage(contact)}
                       className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
                     >
-                      Simulate Message
+                      {t('contacts.simulate')}
                     </button>
                   </div>
                 )}
@@ -135,8 +137,8 @@ export const ContactsPanel: React.FC<ContactsPanelProps> = ({
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-slate-800 bg-slate-900 flex justify-end gap-2 shrink-0">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg">Cancel</button>
-          <button onClick={handleSave} className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-500">Save Changes</button>
+          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg">{t('common.cancel')}</button>
+          <button onClick={handleSave} className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-500">{t('contacts.save')}</button>
         </div>
       </div>
     </div>

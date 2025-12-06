@@ -4,6 +4,7 @@ import { useState } from "react";
 import Card from "./Card";
 import Modal from "./Modal";
 import { Settings, UserProfile, MemoryItem } from "../types";
+import { useLanguage } from "../contexts/LanguageContext";
 
 interface SettingsPanelProps {
   settings: Settings;
@@ -38,6 +39,7 @@ export default function SettingsPanel({
   // So we can just render the Modal with open={true}.
 
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+  const { language, setLanguage, t } = useLanguage();
 
   const handleChange = (key: keyof Settings, value: any) => {
     onChange({ ...settings, [key]: value });
@@ -91,11 +93,32 @@ export default function SettingsPanel({
 
 
   return (
-    <Modal open={true} title="Assistant Settings" onClose={onClose}>
+    <Modal open={true} title={t('settings.title')} onClose={onClose}>
+      {/* Language Settings */}
+      <section className="mb-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
+          {t('settings.language')}
+        </h3>
+        <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-800 w-fit">
+          <button
+            onClick={() => setLanguage('en')}
+            className={`px-3 py-1 text-xs rounded-md transition-colors ${language === 'en' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            English
+          </button>
+          <button
+            onClick={() => setLanguage('nl')}
+            className={`px-3 py-1 text-xs rounded-md transition-colors ${language === 'nl' ? 'bg-violet-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+          >
+            Nederlands
+          </button>
+        </div>
+      </section>
+
       {/* Profile & Memory */}
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
-          Profile & Memory
+          {t('settings.profile')}
         </h3>
         <div className="space-y-3">
           {/* Bio */}
@@ -130,7 +153,7 @@ export default function SettingsPanel({
       {/* Context Settings */}
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
-          Context Settings
+          {t('settings.context')}
         </h3>
         <div className="space-y-2">
           <label className="flex flex-col gap-1 text-xs text-slate-300">
@@ -158,7 +181,7 @@ export default function SettingsPanel({
       {/* Behaviour */}
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
-          Automation
+          {t('settings.automation')}
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-300">
           <label className="flex items-center gap-2">
@@ -205,7 +228,7 @@ export default function SettingsPanel({
         <div className="flex justify-between items-center mb-3">
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Integrations & Links
+              {t('settings.integrations')}
             </h3>
             <p className="text-[10px] text-slate-500">
               Manage connections and custom shortcuts.
@@ -402,7 +425,7 @@ export default function SettingsPanel({
         </h3>
         <div className="flex gap-3">
           <button onClick={onClearChat} className="text-xs text-slate-400 hover:text-slate-200 underline">Clear Chat History</button>
-          <button onClick={onReset} className="text-xs text-red-500 hover:text-red-400 underline">Reset All Data</button>
+          <button onClick={onReset} className="text-xs text-red-500 hover:text-red-400 underline">{t('settings.reset')}</button>
         </div>
       </section>
 
@@ -411,7 +434,7 @@ export default function SettingsPanel({
           onClick={onClose}
           className="rounded-full bg-slate-800 px-4 py-1.5 text-xs font-medium text-slate-100 hover:bg-slate-700"
         >
-          Close
+          {t('common.close')}
         </button>
       </div>
     </Modal>

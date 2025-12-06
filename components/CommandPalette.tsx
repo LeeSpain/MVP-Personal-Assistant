@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { PlannerAction, ActionType } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -12,15 +13,16 @@ interface CommandPaletteProps {
   onClose: () => void;
 }
 
-export const CommandPalette: React.FC<CommandPaletteProps> = ({ 
-  isOpen, 
-  isProcessing, 
-  reply, 
-  actions, 
-  onPlanCommand, 
-  onExecute, 
-  onClose 
+export const CommandPalette: React.FC<CommandPaletteProps> = ({
+  isOpen,
+  isProcessing,
+  reply,
+  actions,
+  onPlanCommand,
+  onExecute,
+  onClose
 }) => {
+  const { t } = useLanguage();
   const [commandText, setCommandText] = useState('');
 
   if (!isOpen) return null;
@@ -33,27 +35,27 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col border border-slate-800 overflow-hidden text-slate-200">
         <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center shrink-0">
-          <h2 className="text-sm font-semibold text-white">Command Palette</h2>
+          <h2 className="text-sm font-semibold text-white">{t('command.title')}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
         </div>
-        
+
         <div className="p-6 overflow-y-auto space-y-6 bg-slate-950/50 flex-1">
           <div className="space-y-2">
             <textarea
               className="w-full p-4 rounded-xl border border-slate-700 bg-slate-900 text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none resize-none placeholder-slate-500"
               rows={3}
-              placeholder="e.g. Schedule a meeting with Lee next Tuesday..."
+              placeholder={t('command.placeholder')}
               value={commandText}
               onChange={e => setCommandText(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handlePlan())}
             />
             <div className="flex justify-end">
-              <button 
+              <button
                 onClick={handlePlan}
                 disabled={isProcessing || !commandText.trim()}
                 className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-indigo-500 transition-colors"
               >
-                {isProcessing ? 'Planning...' : 'Plan Actions'}
+                {isProcessing ? t('command.planning') : t('command.plan')}
               </button>
             </div>
           </div>
@@ -67,7 +69,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
               )}
               {actions.length > 0 && (
                 <div className="space-y-2">
-                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Planned Actions</h3>
+                  <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('command.actions')}</h3>
                   {actions.map((action, i) => (
                     <div key={i} className="bg-slate-900 p-3 rounded-lg border border-slate-800 text-sm shadow-sm flex items-center gap-3">
                       <span className="bg-slate-800 text-slate-400 text-[10px] font-bold px-2 py-1 rounded uppercase">
@@ -85,13 +87,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         </div>
 
         <div className="px-6 py-4 border-t border-slate-800 bg-slate-900 flex justify-end gap-2 shrink-0">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg">Cancel</button>
-          <button 
+          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg">{t('common.cancel')}</button>
+          <button
             onClick={onExecute}
             disabled={actions.length === 0}
             className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 disabled:opacity-50 transition-colors"
           >
-            Execute Plan
+            {t('command.execute')}
           </button>
         </div>
       </div>

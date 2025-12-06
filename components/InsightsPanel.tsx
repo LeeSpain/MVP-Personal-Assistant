@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Modal from "./Modal";
 import { DiaryEntry, Meeting, ActionLogEntry, ChatMessage, Contact } from "../types";
+import { useLanguage } from "../contexts/LanguageContext";
 
 interface InsightsPanelProps {
   diaryEntries: DiaryEntry[];
@@ -21,6 +22,7 @@ export default function InsightsPanel({
   onClose,
   onGenerateInsights
 }: InsightsPanelProps) {
+  const { t } = useLanguage();
   const [suggestions, setSuggestions] = useState<string | null>(null);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
 
@@ -59,20 +61,20 @@ export default function InsightsPanel({
   }, []);
 
   return (
-    <Modal open={true} title="Executive Dashboard & Insights" onClose={onClose} className="max-w-6xl h-[85vh]">
+    <Modal open={true} title={t('insights.title')} onClose={onClose} className="max-w-6xl h-[85vh]">
       <div className="space-y-6 h-full flex flex-col">
 
         {/* Top Row: Key Metrics Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 shrink-0">
           <MetricCard
-            label="Weekly Activity"
+            label={t('insights.metrics.activity')}
             value={chatsThisWeek.toString()}
             subtext="Chat sessions"
             icon="💬"
             trend="Active"
           />
           <MetricCard
-            label="Open Loops"
+            label={t('insights.metrics.loops')}
             value={openLoopsCount.toString()}
             subtext="Pending items"
             icon="⭕"
@@ -80,13 +82,13 @@ export default function InsightsPanel({
             trendColor={openLoopsCount > 5 ? "text-amber-400" : "text-emerald-400"}
           />
           <MetricCard
-            label="Focus Ratio"
+            label={t('insights.metrics.focus')}
             value={focusBalance.toString()}
             subtext="Deep Work / Exec"
             icon="⚖️"
           />
           <MetricCard
-            label="Network Reach"
+            label={t('insights.metrics.network')}
             value={relationshipTouches.toString()}
             subtext="Contact mentions"
             icon="👥"
@@ -104,7 +106,7 @@ export default function InsightsPanel({
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
-                  AI Strategic Analysis
+                  {t('insights.analysis')}
                 </h3>
                 {isLoadingSuggestions && <span className="text-xs text-slate-500">Processing...</span>}
               </div>
@@ -138,7 +140,7 @@ export default function InsightsPanel({
             {/* Focus Breakdown */}
             <div className="bg-slate-800/40 rounded-2xl p-5 border border-slate-700/50">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-4">
-                Work Distribution
+                {t('insights.breakdown')}
               </h3>
               <div className="space-y-4">
                 <ProgressBar label="Deep Work (Meetings)" value={deepWorkCount} max={deepWorkCount + executionCount + 5} color="bg-blue-500" />
@@ -150,7 +152,7 @@ export default function InsightsPanel({
             {/* Quick Stats / Summary */}
             <div className="bg-slate-800/40 rounded-2xl p-5 border border-slate-700/50 flex-1">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-4">
-                System Status
+                {t('insights.status')}
               </h3>
               <div className="space-y-3 text-sm text-slate-300">
                 <div className="flex justify-between border-b border-slate-700/50 pb-2">
@@ -181,7 +183,7 @@ export default function InsightsPanel({
             onClick={onClose}
             className="px-6 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition-colors"
           >
-            Close Dashboard
+            {t('insights.close')}
           </button>
         </div>
 

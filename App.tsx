@@ -20,6 +20,7 @@ import { useMemorySummarizer } from './hooks/useMemorySummarizer';
 import { useMeetings } from './hooks/useMeetings';
 import { useDiary } from './hooks/useDiary';
 import { useChat } from './hooks/useChat';
+import { useLanguage } from './contexts/LanguageContext';
 import {
   ChatMessage,
   ChatSession,
@@ -63,6 +64,7 @@ const DEFAULT_SETTINGS: Settings = {
 };
 
 const App: React.FC = () => {
+  const { language, t } = useLanguage();
   // --- Local State ---
   const [isInitialized, setIsInitialized] = useState(false);
   const [mode, setMode] = useState<Mode>(() => {
@@ -293,7 +295,7 @@ const App: React.FC = () => {
         console.warn(`Invalid action proposed: ${action.type}`, action);
         setNotifications(prev => [{
           id: crypto.randomUUID(),
-          message: `⚠️ AI proposed invalid action (${action.type}). Ignored.`,
+          message: t('notifications.invalidAction', { type: action.type }),
           createdAt: new Date()
         }, ...prev]);
         return;
@@ -332,10 +334,10 @@ const App: React.FC = () => {
           const ch = channel || 'email';
           const sub = subject || 'no subject';
 
-          let emailMsg = `📧 Email planned to ${name} via ${ch}. Subject: "${sub}" (simulation only).`;
+          let emailMsg = t('notifications.emailPlanned', { name, channel: ch, subject: sub });
 
           if (settings.requireConfirmBeforeEmail) {
-            emailMsg = `⚠️ Draft Email created for ${name} (${ch}). Review required.`;
+            emailMsg = t('notifications.emailDraft', { name, channel: ch });
           }
 
           setNotifications(prev => [{
@@ -362,7 +364,7 @@ const App: React.FC = () => {
 
           setNotifications(prev => [{
             id: crypto.randomUUID(),
-            message: `🎥 Video link generated for "${title}"`,
+            message: t('notifications.videoLink', { title }),
             createdAt: new Date()
           }, ...prev]);
           break;
@@ -397,7 +399,7 @@ const App: React.FC = () => {
 
           setNotifications(prev => [{
             id: crypto.randomUUID(),
-            message: `🧠 Memorized: "${newMemory.content.substring(0, 30)}..."`,
+            message: t('notifications.memorized', { content: newMemory.content.substring(0, 30) }),
             createdAt: new Date()
           }, ...prev]);
           break;
@@ -415,7 +417,7 @@ const App: React.FC = () => {
           }));
           setNotifications(prev => [{
             id: crypto.randomUUID(),
-            message: `👤 Profile Updated`,
+            message: t('notifications.profileUpdated'),
             createdAt: new Date()
           }, ...prev]);
           break;
@@ -425,7 +427,7 @@ const App: React.FC = () => {
             setMode(action.payload.mode);
             setNotifications(prev => [{
               id: crypto.randomUUID(),
-              message: `🔄 Mode switched to ${action.payload.mode}`,
+              message: t('notifications.modeSwitched', { mode: action.payload.mode! }),
               createdAt: new Date()
             }, ...prev]);
           }
@@ -464,7 +466,7 @@ const App: React.FC = () => {
 
     setNotifications(prev => [{
       id: crypto.randomUUID(),
-      message: `↩️ Undid: ${lastActionBatch.description}`,
+      message: t('notifications.undid', { description: lastActionBatch.description }),
       createdAt: new Date()
     }, ...prev]);
 
@@ -477,6 +479,7 @@ const App: React.FC = () => {
 
     // Build Context
     const richContext = {
+      language,
       mode,
       date: new Date().toISOString(),
       goals: settings.goals || 'not specified',
@@ -518,7 +521,7 @@ const App: React.FC = () => {
   };
 
   const handleDeleteDiaryEntry = (id: string) => {
-    if (window.confirm("Delete this diary entry?")) {
+    if (window.confirm(t('confirmations.deleteDiary'))) {
       deleteDiaryEntry(id);
     }
   };
@@ -532,7 +535,7 @@ const App: React.FC = () => {
   };
 
   const handleDeleteMeeting = (id: string) => {
-    if (window.confirm("Remove this meeting?")) {
+    if (window.confirm(t('confirmations.deleteMeeting'))) {
       deleteMeeting(id);
     }
   };
@@ -554,7 +557,7 @@ const App: React.FC = () => {
   };
 
   const handleResetData = () => {
-    if (window.confirm("Are you sure you want to reset all data? This cannot be undone.")) {
+    if (window.confirm(t('confirmations.resetData'))) {
       localStorage.clear();
       window.location.reload();
     }
@@ -565,7 +568,7 @@ const App: React.FC = () => {
   };
 
   const handleSimulateMessageToContact = (contact: Contact) => {
-    const message = `Simulated message to ${contact.name} via ${contact.primaryChannel}.`;
+    const message = t('notifications.simulatedMessage', { name: contact.name, channel: contact.primaryChannel });
     setNotifications(prev => [
       {
         id: crypto.randomUUID(),
@@ -616,6 +619,7 @@ const App: React.FC = () => {
     const context = contextLines.join('\n');
 
     const richContext = {
+      language,
       mode,
       date: new Date().toISOString(),
       goals: settings.goals || 'not specified',
@@ -658,7 +662,7 @@ const App: React.FC = () => {
     setNotifications(prev => [
       {
         id: crypto.randomUUID(),
-        message: `Executed command: ${lastCommandText || 'unnamed command'} (${commandPreviewActions.length} action(s))`,
+        message: t('notifications.commandExecuted', { command: lastCommandText || 'unnamed command', count: commandPreviewActions.length }),
         createdAt: new Date(),
       },
       ...prev,
@@ -725,15 +729,21 @@ const App: React.FC = () => {
       onGenerateWeeklySummary={handleGenerateWeeklySummary}
       isSummarizing={isSummarizing}
     >
-      {/* Undo Ribbon */}
+      {/* Undo Toast */}
       {lastActionBatch && (
-        <div className="absolute top-0 left-0 right-0 bg-indigo-600 text-white text-xs py-1 px-4 flex justify-between items-center z-50 shadow-md">
-          <span>{lastActionBatch.description}</span>
+        <div className="fixed bottom-24 lg:bottom-8 left-1/2 transform -translate-x-1/2 bg-slate-900 border border-indigo-500/50 text-white text-sm py-2 px-4 rounded-full flex items-center gap-4 z-[60] shadow-xl animate-in fade-in slide-in-from-bottom-4">
+          <span className="text-indigo-200">{lastActionBatch.description}</span>
           <button
             onClick={handleUndo}
-            className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors"
+            className="bg-indigo-600 hover:bg-indigo-500 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider transition-colors"
           >
-            Undo
+            {t('common.undo')}
+          </button>
+          <button
+            onClick={() => setLastActionBatch(null)}
+            className="text-slate-500 hover:text-white ml-2"
+          >
+            ×
           </button>
         </div>
       )}
@@ -763,7 +773,7 @@ const App: React.FC = () => {
           />
           {isProcessing && (
             <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-white px-3 py-1 rounded-full shadow text-xs text-indigo-500 animate-pulse z-10">
-              Processing...
+              {t('common.processing')}
             </div>
           )}
           <div className="absolute top-4 right-4 flex gap-2">

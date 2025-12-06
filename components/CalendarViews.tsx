@@ -13,7 +13,9 @@ import {
     differenceInMinutes,
     isWithinInterval
 } from 'date-fns';
+import { nl, enUS } from 'date-fns/locale';
 import { Meeting } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface CalendarViewProps {
     currentDate: Date;
@@ -30,8 +32,12 @@ export const MonthView: React.FC<CalendarViewProps> = ({ currentDate, meetings, 
     const startDate = startOfWeek(monthStart, { weekStartsOn: 1 }); // Monday start
     const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 });
 
+    const { language } = useLanguage();
+    const locale = language === 'nl' ? nl : enUS;
+
     const days = eachDayOfInterval({ start: startDate, end: endDate });
-    const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    // Generate week days dynamically based on locale
+    const weekDays = days.slice(0, 7).map(day => format(day, 'EEE', { locale }));
 
     return (
         <div className="flex flex-col h-full">
@@ -101,6 +107,8 @@ export const MonthView: React.FC<CalendarViewProps> = ({ currentDate, meetings, 
 
 // --- Week View ---
 export const WeekView: React.FC<CalendarViewProps> = ({ currentDate, meetings, onUpdateStatus, onDelete, onDayClick }) => {
+    const { language } = useLanguage();
+    const locale = language === 'nl' ? nl : enUS;
     const startDate = startOfWeek(currentDate, { weekStartsOn: 1 });
     const days = Array.from({ length: 7 }).map((_, i) => addDays(startDate, i));
     const hours = Array.from({ length: 17 }).map((_, i) => i + 6); // 6 AM to 10 PM
@@ -118,7 +126,7 @@ export const WeekView: React.FC<CalendarViewProps> = ({ currentDate, meetings, o
                             className="flex-1 py-2 text-center border-l border-slate-800/50 cursor-pointer hover:bg-slate-800/30 transition-colors"
                         >
                             <div className={`text-xs font-semibold uppercase ${isToday ? 'text-violet-400' : 'text-slate-500'}`}>
-                                {format(day, 'EEE')}
+                                {format(day, 'EEE', { locale })}
                             </div>
                             <div className={`text-sm font-bold ${isToday ? 'text-violet-400' : 'text-slate-300'}`}>
                                 {format(day, 'd')}
@@ -198,6 +206,8 @@ export const WeekView: React.FC<CalendarViewProps> = ({ currentDate, meetings, o
 
 // --- List View (Mobile Optimized) ---
 export const ListView: React.FC<CalendarViewProps> = ({ currentDate, meetings, onUpdateStatus, onDelete, onDayClick }) => {
+    const { language } = useLanguage();
+    const locale = language === 'nl' ? nl : enUS;
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(monthStart);
     const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -213,7 +223,7 @@ export const ListView: React.FC<CalendarViewProps> = ({ currentDate, meetings, o
                 return (
                     <div key={day.toString()} className="mb-4 px-4">
                         <div className={`text-xs font-bold uppercase mb-2 sticky top-0 bg-slate-900/95 backdrop-blur py-2 z-10 ${isToday ? 'text-violet-400' : 'text-slate-500'}`}>
-                            {format(day, 'EEEE, MMMM d')}
+                            {format(day, 'EEEE, MMMM d', { locale })}
                         </div>
                         <div className="space-y-2">
                             {dayMeetings.map(meeting => (
