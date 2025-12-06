@@ -1,8 +1,7 @@
 import { SYSTEM_PROMPT } from '../app/api/ai/chat/systemPrompt';
 
-const apiKey = process.env.GEMINI_API_KEY;
-
 export async function generateAIResponse(message: string, context: any, history: any[]) {
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         throw new Error('GEMINI_API_KEY is not set in environment variables.');
     }
