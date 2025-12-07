@@ -37,6 +37,7 @@ model User {
 
   memories      Memory[]
   integrations  Integration[]
+  pillarSettings PillarSetting[]
 }
 
 model Meeting {
@@ -172,5 +173,24 @@ model Integration {
   updatedAt    DateTime @updatedAt
 
   @@unique([userId, provider])
+  @@index([userId])
+}
+
+model PillarSetting {
+  id                 String   @id @default(uuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 'deepWork' | 'execution' | 'relationship' | 'recovery'
+  key                String
+  name               String
+  enabled            Boolean  @default(true)
+  dailyTargetMinutes Int?
+  description        String?
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([userId, key])
   @@index([userId])
 }
