@@ -85,11 +85,13 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
     }, [messages, view]);
 
     const toggleMute = () => {
+        console.log("Toggle mute clicked");
         if (stream) {
             const audioTrack = stream.getAudioTracks()[0];
             if (audioTrack) {
                 audioTrack.enabled = !audioTrack.enabled;
                 setIsMuted(!audioTrack.enabled);
+                console.log("Mute toggled. New state:", !audioTrack.enabled);
 
                 // If we are muting, we should probably stop listening to avoid partial transcripts
                 if (audioTrack.enabled) {
@@ -98,6 +100,10 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
                     if (isListening) stopListening();
                 }
             }
+        } else {
+            console.warn("No stream to mute");
+            // Still toggle UI state for feedback if user wants to be "muted" before stream starts?
+            // Better to just keep it disabled or log.
         }
     };
 
@@ -105,11 +111,14 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-slate-950 z-50 flex flex-col items-center justify-center p-6">
+        <div className="fixed inset-0 bg-slate-950 z-[100] flex flex-col items-center justify-center p-6">
             {/* Close Button */}
             <button
-                onClick={onClose}
-                className="absolute top-6 right-6 text-slate-400 hover:text-white z-50"
+                onClick={() => {
+                    console.log("Close clicked");
+                    onClose();
+                }}
+                className="absolute top-6 right-6 text-slate-400 hover:text-white z-[110] p-2 hover:bg-slate-800 rounded-full transition-colors"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -117,17 +126,20 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
             </button>
 
             {/* View Toggle */}
-            <div className="absolute top-6 left-6 z-50">
+            <div className="absolute top-6 left-6 z-[110]">
                 <button
-                    onClick={() => setView(view === 'visualizer' ? 'chat' : 'visualizer')}
-                    className="bg-slate-800 text-slate-300 hover:text-white px-4 py-2 rounded-full text-sm font-medium transition-colors border border-slate-700"
+                    onClick={() => {
+                        console.log("View toggle clicked. Current:", view);
+                        setView(view === 'visualizer' ? 'chat' : 'visualizer');
+                    }}
+                    className="bg-slate-800 text-slate-300 hover:text-white px-4 py-2 rounded-full text-sm font-medium transition-colors border border-slate-700 shadow-lg"
                 >
                     {view === 'visualizer' ? 'Show Chat' : 'Show Visualizer'}
                 </button>
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 w-full max-w-2xl flex flex-col items-center justify-center relative">
+            <div className="flex-1 w-full max-w-2xl flex flex-col items-center justify-center relative z-[105]">
 
                 {view === 'visualizer' ? (
                     <>
@@ -157,7 +169,7 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
                     </>
                 ) : (
                     /* Chat View */
-                    <div className="w-full h-[60vh] bg-slate-900/50 rounded-2xl border border-slate-800 p-4 overflow-y-auto custom-scrollbar">
+                    <div className="w-full h-[60vh] bg-slate-900/50 rounded-2xl border border-slate-800 p-4 overflow-y-auto custom-scrollbar relative z-[110]">
                         <div className="space-y-4">
                             {messages.map((m) => (
                                 <div
@@ -188,11 +200,11 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
             </div>
 
             {/* Controls */}
-            <div className="mt-8 flex gap-6 z-50">
+            <div className="mt-8 flex gap-6 z-[110]">
                 {/* Mute Button */}
                 <button
                     onClick={toggleMute}
-                    className={`p-4 rounded-full transition-all ${isMuted ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                    className={`p-4 rounded-full transition-all shadow-lg ${isMuted ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
                     title={isMuted ? "Unmute" : "Mute"}
                 >
                     {isMuted ? (
@@ -208,10 +220,11 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
 
                 <button
                     onClick={() => {
+                        console.log("Listening toggle clicked");
                         if (isListening) stopListening();
                         else startListening();
                     }}
-                    className={`p-4 rounded-full transition-all ${isListening ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                    className={`p-4 rounded-full transition-all shadow-lg ${isListening ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
                 >
                     {isListening ? (
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
