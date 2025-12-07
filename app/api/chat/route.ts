@@ -109,7 +109,18 @@ ASSISTANT:
 
         if (!geminiResponse.ok) {
             const errorText = await geminiResponse.text();
-            console.error('Gemini API error:', errorText);
+            console.error('Gemini API error:', geminiResponse.status, errorText);
+
+            // Handle 429 Quota Exceeded gracefully
+            if (geminiResponse.status === 429) {
+                return new Response(
+                    JSON.stringify({
+                        reply: "I'm currently overloaded with requests and have hit my rate limit. Please give me a moment to cool down and try again shortly."
+                    }),
+                    { status: 200, headers: { 'Content-Type': 'application/json' } }
+                );
+            }
+
             return new Response(
                 JSON.stringify({
                     error: 'Gemini API error',
