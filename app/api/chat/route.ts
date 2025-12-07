@@ -1,5 +1,3 @@
-import { SYSTEM_PROMPT } from '../ai/chat/systemPrompt';
-
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
@@ -20,72 +18,57 @@ export async function POST(req: Request) {
             );
         }
 
+        // Construct the prompt from recent messages
+        // We'll take the last few messages to give context, but keep it simple for now.
+        // Gemini 1.5 Flash supports a list of contents.
+        const contents = messages.map((m: ChatMessage) => ({
+            role: m.role === 'user' ? 'user' : 'model',
+            parts: [{ text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }]
+        }));
+
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
             return new Response(
-                JSON.stringify({ error: 'GEMINI_API_KEY is not set' }),
+                JSON.stringify({ error: 'GEMINI_API_KEY not configured' }),
                 { status: 500, headers: { 'Content-Type': 'application/json' } }
             );
         }
 
-        // Flatten the conversation into a single text prompt
-        const conversationText = (messages as ChatMessage[])
-            .map((m) => {
-                const text =
-                    typeof m.content === 'string'
-                        ? m.content
-                        : JSON.stringify(m.content);
-                const label = m.role.toUpperCase();
-                return `${label}: ${text}`;
-            })
-            .join('\n');
-
-        const prompt = `${SYSTEM_PROMPT}\n\nConversation so far:\n${conversationText}\n\nASSISTANT:`;
-
-        // IMPORTANT: use a valid model name WITHOUT "-latest"
-        const geminiResponse = await fetch(
-            'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=' +
-            apiKey,
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
             {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    contents: [
-                        {
-                            role: 'user',
-                            parts: [{ text: prompt }],
-                        },
-                    ],
+                    contents: contents,
                 }),
             }
         );
 
-        if (!geminiResponse.ok) {
-            const errorText = await geminiResponse.text();
-            console.error('Gemini API error:', errorText);
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Gemini API Error:', response.status, errorText);
             return new Response(
-                JSON.stringify({
-                    error: 'Gemini API error',
-                    detail: errorText,
-                }),
-                { status: 500, headers: { 'Content-Type': 'application/json' } }
+                JSON.stringify({ error: 'Gemini API Error', detail: errorText }),
+                { status: response.status, headers: { 'Content-Type': 'application/json' } }
             );
         }
 
-        const data = await geminiResponse.json();
+        const data = await response.json();
 
-        const replyText =
-            data?.candidates?.[0]?.content?.parts
-                ?.map((p: any) => p.text || '')
-                .join(' ')
-                .trim() || 'I could not generate a response.';
+        // Parse the response
+        // candidates[0].content.parts[*].text
+        const candidate = data.candidates?.[0];
+        const parts = candidate?.content?.parts || [];
+        const reply = parts.map((p: any) => p.text).join('').trim();
 
         return new Response(
-            JSON.stringify({ reply: replyText }),
+            JSON.stringify({ reply }),
             { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
+
     } catch (err: any) {
         console.error('CHAT ROUTE ERROR:', err);
         return new Response(
