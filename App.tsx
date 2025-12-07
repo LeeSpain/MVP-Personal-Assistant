@@ -494,19 +494,25 @@ const App: React.FC = () => {
             ...chatMessages,
             { role: 'user', content },
           ],
-          context: null,      // you can wire your real context later
-          sessionId: null,    // or reuse an existing sessionId if you track it
+          context: null,
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('API /api/chat error:', errorData);
+
+        const detail =
+          (errorData && (errorData.detail || errorData.error)) ||
+          'Unknown internal error.';
+
         setChatMessages((prev) => [
           ...prev,
           {
             role: 'assistant',
-            content: 'Sorry, I had an internal error and could not respond right now.',
+            content:
+              'Sorry, I had an internal error and could not respond right now. Details: ' +
+              detail,
             id: crypto.randomUUID(),
             timestamp: new Date()
           },
@@ -532,7 +538,8 @@ const App: React.FC = () => {
         ...prev,
         {
           role: 'assistant',
-          content: 'Network error talking to the assistant. Please check your connection.',
+          content:
+            'Network error talking to the assistant. Please check your connection.',
           id: crypto.randomUUID(),
           timestamp: new Date()
         },
