@@ -20,6 +20,7 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
 
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [status, setStatus] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
+    const [isMuted, setIsMuted] = useState(false);
 
     const lastMessageIdRef = useRef<string | null>(null);
 
@@ -43,25 +44,26 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
         } else if (!isOpen && stream) {
             stream.getTracks().forEach(track => track.stop());
             setStream(null);
+            setIsMuted(false); // Reset mute state on close
         }
     }, [isOpen, stream]);
 
     // 3. Auto-start listening when open (or after speaking)
     useEffect(() => {
-        if (isOpen && !isProcessing && status === 'idle' && !isListening && !isSpeaking) {
+        if (isOpen && !isProcessing && status === 'idle' && !isListening && !isSpeaking && !isMuted) {
             startListening();
         }
-    }, [isOpen, isProcessing, status, isListening, isSpeaking, startListening]);
+    }, [isOpen, isProcessing, status, isListening, isSpeaking, startListening, isMuted]);
 
     // 4. Handle Sending Message
     useEffect(() => {
-        if (!isListening && transcript && status !== 'thinking' && status !== 'speaking') {
+        if (!isListening && transcript && status !== 'thinking' && status !== 'speaking' && !isMuted) {
             // Recognition ended and we have text
             setStatus('thinking');
             onSendMessage(transcript);
             resetTranscript();
         }
-    }, [isListening, transcript, status, onSendMessage, resetTranscript]);
+    }, [isListening, transcript, status, onSendMessage, resetTranscript, isMuted]);
 
     // 5. Handle AI Speaking (TTS)
     useEffect(() => {
@@ -71,6 +73,23 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
             speak(lastMsg.content, language === 'nl' ? 'nl-NL' : 'en-US');
         }
     }, [messages, language, speak]);
+
+    const toggleMute = () => {
+        if (stream) {
+            const audioTrack = stream.getAudioTracks()[0];
+            if (audioTrack) {
+                audioTrack.enabled = !audioTrack.enabled;
+                setIsMuted(!audioTrack.enabled);
+
+                // If we are muting, we should probably stop listening to avoid partial transcripts
+                if (audioTrack.enabled) {
+                    if (!isListening && !isSpeaking) startListening();
+                } else {
+                    if (isListening) stopListening();
+                }
+            }
+        }
+    };
 
 
     if (!isOpen) return null;
@@ -90,9 +109,9 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
             {/* Status Text */}
             <div className="mb-12 text-center space-y-2">
                 <h2 className="text-2xl font-light text-slate-100 tracking-wider uppercase">
-                    {t(`voice.${status}` as any)}
+                    {isMuted ? 'MUTED' : t(`voice.${status}` as any)}
                 </h2>
-                {transcript && (
+                {transcript && !isMuted && (
                     <p className="text-slate-400 text-lg italic max-w-md mx-auto">
                         &quot;{transcript}&quot;
                     </p>
@@ -106,13 +125,30 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
 
                 <AudioVisualizer
                     stream={stream}
-                    isActive={true}
+                    isActive={!isMuted}
                     color={status === 'speaking' ? '#34d399' : '#8b5cf6'} // Green for AI, Violet for User
                 />
             </div>
 
             {/* Controls */}
             <div className="mt-16 flex gap-6">
+                {/* Mute Button */}
+                <button
+                    onClick={toggleMute}
+                    className={`p-4 rounded-full transition-all ${isMuted ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                    title={isMuted ? "Unmute" : "Mute"}
+                >
+                    {isMuted ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.69 0-1.25-.56-1.25-1.25v-6.75c0-.69.56-1.25 1.25-1.25h2.25z" />
+                        </svg>
+                    ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H6.375c-.621 0-1.125-.504-1.125-1.125v-9.375c0-.621.504-1.125 1.125-1.125h3.375z" />
+                        </svg>
+                    )}
+                </button>
+
                 <button
                     onClick={() => {
                         if (isListening) stopListening();
