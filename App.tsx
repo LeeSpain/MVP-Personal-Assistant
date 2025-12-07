@@ -850,6 +850,7 @@ const App: React.FC = () => {
               voiceInputEnabled={settings.voiceInputEnabled}
               voiceOutputEnabled={settings.voiceOutputEnabled}
               onToggleVoiceOutput={() => setSettings(prev => ({ ...prev, voiceOutputEnabled: !prev.voiceOutputEnabled }))}
+              onOpenVoiceMode={() => setIsVoiceModeOpen(true)}  {/* 🔥 ADDED SO MOBILE MIC OPENS VOICE MODE */}
               isProcessing={isProcessing}
             />
             {isProcessing && (

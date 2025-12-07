@@ -18,7 +18,7 @@ export default function VoiceMode({
     onClose,
     onSendMessage,
     messages,
-    isProcessing,
+    isProcessing
 }: VoiceModeProps) {
     const { t, language } = useLanguage();
     const {
@@ -26,21 +26,19 @@ export default function VoiceMode({
         transcript,
         startListening,
         stopListening,
-        resetTranscript,
+        resetTranscript
     } = useSpeechRecognition(language === 'nl' ? 'nl-NL' : 'en-US');
-
-    const { speak, isSpeaking, cancel } = useTextToSpeech();
+    const { speak, isSpeaking } = useTextToSpeech();
 
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [status, setStatus] =
         useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
     const [isMuted, setIsMuted] = useState(false);
     const [view, setView] = useState<'visualizer' | 'chat'>('visualizer');
-
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const lastMessageIdRef = useRef<string | null>(null);
 
-    // ---------- CLOSE HANDLER ----------
+    // -------- CLOSE HANDLER (IMPORTANT) ----------
     const handleClose = () => {
         console.log('VoiceMode: handleClose');
 
@@ -50,21 +48,18 @@ export default function VoiceMode({
         }
         resetTranscript();
 
-        // Stop TTS
-        cancel?.();
-
         // Stop microphone stream
         if (stream) {
-            stream.getTracks().forEach((track) => track.stop());
+            stream.getTracks().forEach(track => track.stop());
             setStream(null);
         }
 
-        // Reset local UI state
+        // Reset UI state
         setIsMuted(false);
         setView('visualizer');
         setStatus('idle');
 
-        // Notify parent to hide overlay
+        // Tell parent to hide overlay
         onClose();
     };
 
@@ -84,13 +79,13 @@ export default function VoiceMode({
         if (isOpen && !stream) {
             navigator.mediaDevices
                 .getUserMedia({ audio: true })
-                .then((s) => setStream(s))
-                .catch((e) => console.error('Mic access denied', e));
+                .then(s => setStream(s))
+                .catch(e => console.error('Mic access denied', e));
         } else if (!isOpen && stream) {
-            stream.getTracks().forEach((track) => track.stop());
+            stream.getTracks().forEach(track => track.stop());
             setStream(null);
-            setIsMuted(false);
-            setView('visualizer');
+            setIsMuted(false); // Reset mute state on close
+            setView('visualizer'); // Reset view on close
         }
     }, [isOpen, stream]);
 
@@ -113,7 +108,7 @@ export default function VoiceMode({
         isListening,
         isSpeaking,
         startListening,
-        isMuted,
+        isMuted
     ]);
 
     // 4. Handle Sending Message
@@ -125,6 +120,7 @@ export default function VoiceMode({
             status !== 'speaking' &&
             !isMuted
         ) {
+            // Recognition ended and we have text
             setStatus('thinking');
             onSendMessage(transcript);
             resetTranscript();
@@ -159,8 +155,9 @@ export default function VoiceMode({
                 audioTrack.enabled = !audioTrack.enabled;
                 const nowMuted = !audioTrack.enabled;
                 setIsMuted(nowMuted);
-                console.log('Mute toggled. New muted state:', nowMuted);
+                console.log('Mute toggled. New state:', nowMuted);
 
+                // If we are muting, stop listening to avoid partial transcripts
                 if (nowMuted) {
                     if (isListening) stopListening();
                 } else {
@@ -241,15 +238,15 @@ export default function VoiceMode({
                                     status === 'speaking'
                                         ? '#34d399'
                                         : '#8b5cf6'
-                                }
+                                } // Green for AI, Violet for User
                             />
                         </div>
                     </>
                 ) : (
-                    // Chat View
+                    /* Chat View */
                     <div className="w-full h-[60vh] bg-slate-900/50 rounded-2xl border border-slate-800 p-4 overflow-y-auto custom-scrollbar relative z-[110]">
                         <div className="space-y-4">
-                            {messages.map((m) => (
+                            {messages.map(m => (
                                 <div
                                     key={m.id}
                                     className={`flex ${m.role === 'user'
