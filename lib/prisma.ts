@@ -28,6 +28,13 @@ if (process.env.DATABASE_URL) {
             url: process.env.DATABASE_URL,
         },
     };
+} else {
+    // Fallback for build time if env var is missing
+    prismaClientOptions.datasources = {
+        db: {
+            url: "postgresql://dummy:dummy@localhost:5432/dummy",
+        },
+    };
 }
 
 export const prisma =
