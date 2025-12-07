@@ -20,98 +20,117 @@ export async function POST(req: Request) {
             );
         }
 
-        // Construct Context String
-        let contextString = "";
-        if (context) {
-            contextString += "=== USER CONTEXT ===\n";
-
-            if (context.todaysMeetings && context.todaysMeetings.length > 0) {
-                contextString += `\nTODAY'S MEETINGS:\n${JSON.stringify(context.todaysMeetings, null, 2)}\n`;
-            }
-
-            if (context.recentDiary && context.recentDiary.length > 0) {
-                contextString += `\nRECENT DIARY ENTRIES:\n${JSON.stringify(context.recentDiary, null, 2)}\n`;
-            }
-
-            if (context.focusItems && context.focusItems.length > 0) {
-                contextString += `\nCURRENT FOCUS:\n${JSON.stringify(context.focusItems, null, 2)}\n`;
-            }
-
-            if (context.goals) {
-                contextString += `\nGOALS: ${context.goals}\n`;
-            }
-
-            if (context.aiBehavior) {
-                contextString += `\nPREFERRED AI BEHAVIOR: ${context.aiBehavior}\n`;
-            }
-
-            contextString += "\n=== END USER CONTEXT ===\n";
-        }
-
-        // Combine System Prompt + Context
-        const fullSystemInstruction = `${SYSTEM_PROMPT}\n\n${contextString}`;
-
-        // Construct the prompt from recent messages
-        // We'll take the last few messages to give context, but keep it simple for now.
-        // Gemini 1.5 Flash supports a list of contents.
-        const contents = messages.map((m: ChatMessage) => ({
-            role: m.role === 'user' ? 'user' : 'model',
-            parts: [{ text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }]
-        }));
-
-        // Prepend system instruction as a "user" message with a specific prefix if system_instruction is not supported,
-        // OR use the system_instruction field. 
-        // Since we are using v1beta, we can try to use the system_instruction field, 
-        // BUT the user asked to "Prepend this to the SYSTEM_PROMPT before sending to Gemini".
-        // To be safe and follow the instruction "Prepend this to the SYSTEM_PROMPT", we will combine them.
-        // And then we will use the `system_instruction` field of the API.
-
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
             return new Response(
-                JSON.stringify({ error: 'GEMINI_API_KEY not configured' }),
+                JSON.stringify({ error: 'GEMINI_API_KEY is not set' }),
                 { status: 500, headers: { 'Content-Type': 'application/json' } }
             );
         }
 
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
+        // 1) Build conversation text
+        const conversationText = (messages as ChatMessage[])
+            .map((m) => {
+                const text =
+                    typeof m.content === 'string'
+                        ? m.content
+                        : JSON.stringify(m.content);
+                const label = m.role.toUpperCase();
+                return `${label}: ${text}`;
+            })
+            .join('\n');
+
+        // 2) Build a rich context string from the context object (no DB)
+        let contextString = '';
+        if (context && typeof context === 'object') {
+            const mode = context.mode ?? null;
+            const focusItems = context.focusItems ?? [];
+            const recentDiary = context.recentDiary ?? [];
+            const todaysMeetings = context.todaysMeetings ?? [];
+            const thisWeeksMeetings = context.thisWeeksMeetings ?? context.weekMeetings ?? [];
+            const recentContacts = context.recentContacts ?? [];
+            const goals = context.goals ?? null;
+            const aiBehavior = context.aiBehavior ?? null;
+            const userProfile = context.userProfile ?? null;
+            const dailySummary = context.dailySummary ?? null;
+            const weeklySummary = context.weeklySummary ?? null;
+
+            contextString = `
+CURRENT USER CONTEXT (FOR YOUR EYES ONLY, DO NOT OUTPUT VERBATIM):
+
+- Mode: ${mode ?? 'unknown'}
+- Focus items: ${JSON.stringify(focusItems)}
+- Recent diary entries: ${JSON.stringify(recentDiary)}
+- Today’s meetings and appointments: ${JSON.stringify(todaysMeetings)}
+- This week’s meetings and appointments: ${JSON.stringify(thisWeeksMeetings)}
+- Recent contacts: ${JSON.stringify(recentContacts)}
+- User goals: ${JSON.stringify(goals)}
+- AI behaviour instructions: ${JSON.stringify(aiBehavior)}
+- User profile: ${JSON.stringify(userProfile)}
+- Daily summary: ${dailySummary ?? 'none'}
+- Weekly summary: ${weeklySummary ?? 'none'}
+
+You must use this context when answering questions about the user’s schedule, appointments, work, life, or goals.
+If the user asks about their week, meetings, or what they have coming up, read the meetings information here and answer from it.
+`;
+        }
+
+        // 3) Full prompt: system + context + conversation
+        const prompt = `
+${SYSTEM_PROMPT}
+
+${contextString}
+
+Conversation so far:
+${conversationText}
+
+ASSISTANT:
+`;
+
+        // 4) Call Gemini via REST (gemini-2.0-flash, v1beta)
+        const geminiResponse = await fetch(
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' +
+            apiKey,
             {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    system_instruction: {
-                        parts: [{ text: fullSystemInstruction }]
-                    },
-                    contents: contents,
+                    contents: [
+                        {
+                            role: 'user',
+                            parts: [{ text: prompt }],
+                        },
+                    ],
                 }),
             }
         );
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Gemini API Error:', response.status, errorText);
+        if (!geminiResponse.ok) {
+            const errorText = await geminiResponse.text();
+            console.error('Gemini API error:', errorText);
             return new Response(
-                JSON.stringify({ error: 'Gemini API Error', detail: errorText }),
-                { status: response.status, headers: { 'Content-Type': 'application/json' } }
+                JSON.stringify({
+                    error: 'Gemini API error',
+                    detail: errorText,
+                }),
+                { status: 500, headers: { 'Content-Type': 'application/json' } }
             );
         }
 
-        const data = await response.json();
+        const data = await geminiResponse.json();
 
-        // Parse the response
-        // candidates[0].content.parts[*].text
-        const candidate = data.candidates?.[0];
-        const parts = candidate?.content?.parts || [];
-        const reply = parts.map((p: any) => p.text).join('').trim();
+        const replyText =
+            data?.candidates?.[0]?.content?.parts
+                ?.map((p: any) => p.text || '')
+                .join(' ')
+                .trim() || 'I could not generate a response.';
 
         return new Response(
-            JSON.stringify({ reply }),
+            JSON.stringify({ reply: replyText }),
             { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
-
     } catch (err: any) {
         console.error('CHAT ROUTE ERROR:', err);
         return new Response(
