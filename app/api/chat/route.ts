@@ -1,9 +1,13 @@
-import { google } from '@ai-sdk/google';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { generateText, convertToCoreMessages } from 'ai';
 import { SYSTEM_PROMPT } from '../ai/chat/systemPrompt';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
+
+const google = createGoogleGenerativeAI({
+    apiKey: process.env.GEMINI_API_KEY,
+});
 
 export async function POST(req: Request) {
     try {
