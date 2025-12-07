@@ -135,7 +135,7 @@ const App: React.FC = () => {
       role: 'assistant',
       content: "Hi, I'm your personal assistant. How can I help you today?",
       id: 'welcome-msg',
-      timestamp: new Date().toISOString()
+      timestamp: new Date()
     },
   ]);
   const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
@@ -487,7 +487,7 @@ const App: React.FC = () => {
     // 1. Show user message immediately
     setChatMessages((prev) => [
       ...prev,
-      { role: 'user', content, id: crypto.randomUUID(), timestamp: new Date().toISOString() },
+      { role: 'user', content, id: crypto.randomUUID(), timestamp: new Date() },
     ]);
 
     try {
@@ -513,7 +513,7 @@ const App: React.FC = () => {
             content:
               'Internal error: ' + (data.detail || data.error || 'Unknown error'),
             id: crypto.randomUUID(),
-            timestamp: new Date().toISOString()
+            timestamp: new Date()
           },
         ]);
         return;
@@ -525,7 +525,7 @@ const App: React.FC = () => {
           role: 'assistant',
           content: data.reply || '(no reply from assistant)',
           id: crypto.randomUUID(),
-          timestamp: new Date().toISOString()
+          timestamp: new Date()
         },
       ]);
     } catch (err) {
@@ -537,7 +537,7 @@ const App: React.FC = () => {
           content:
             'Network error talking to the assistant. Please check your connection.',
           id: crypto.randomUUID(),
-          timestamp: new Date().toISOString()
+          timestamp: new Date()
         },
       ]);
     }
