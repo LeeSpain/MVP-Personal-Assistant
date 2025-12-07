@@ -18,15 +18,20 @@ if (!process.env.DATABASE_URL) {
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
+const prismaClientOptions: any = {
+    log: ['query'],
+};
+
+if (process.env.DATABASE_URL) {
+    prismaClientOptions.datasources = {
+        db: {
+            url: process.env.DATABASE_URL,
+        },
+    };
+}
+
 export const prisma =
     globalForPrisma.prisma ||
-    new PrismaClient({
-        log: ['query'],
-        datasources: {
-            db: {
-                url: process.env.DATABASE_URL,
-            },
-        },
-    });
+    new PrismaClient(prismaClientOptions);
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
