@@ -20,10 +20,10 @@ export async function POST(req: Request) {
             );
         }
 
-        const apiKey = process.env.GEMINI_API_KEY;
+        const apiKey = process.env.OPENROUTER_API_KEY;
         if (!apiKey) {
             return new Response(
-                JSON.stringify({ error: 'GEMINI_API_KEY is not set' }),
+                JSON.stringify({ error: 'OPENROUTER_API_KEY is not set' }),
                 { status: 500, headers: { 'Content-Type': 'application/json' } }
             );
         }
@@ -87,56 +87,49 @@ ${conversationText}
 ASSISTANT:
 `;
 
-        // 4) Call Gemini via REST (gemini-2.0-flash, v1beta)
-        const geminiResponse = await fetch(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' +
-            apiKey,
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    contents: [
-                        {
-                            role: 'user',
-                            parts: [{ text: prompt }],
-                        },
-                    ],
-                }),
-            }
-        );
+        // 4) Call OpenRouter (DeepSeek R1 free)
+        const openrouterResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + apiKey,
+                'HTTP-Referer': 'http://localhost:3000',
+                'X-Title': 'MVP Personal Assistant Dev'
+            },
+            body: JSON.stringify({
+                model: 'deepseek/deepseek-r1:free',
+                messages: [
+                    { role: 'system', content: prompt },
+                    // We also pass the last user message so the provider has a proper role structure
+                    ...(messages as ChatMessage[])
+                        .map((m) => ({
+                            role: m.role,
+                            content:
+                                typeof m.content === 'string'
+                                    ? m.content
+                                    : JSON.stringify(m.content),
+                        })),
+                ],
+            }),
+        });
 
-        if (!geminiResponse.ok) {
-            const errorText = await geminiResponse.text();
-            console.error('Gemini API error:', geminiResponse.status, errorText);
-
-            // Handle 429 Quota Exceeded gracefully
-            if (geminiResponse.status === 429) {
-                return new Response(
-                    JSON.stringify({
-                        reply: "I'm currently overloaded with requests and have hit my rate limit. Please give me a moment to cool down and try again shortly."
-                    }),
-                    { status: 200, headers: { 'Content-Type': 'application/json' } }
-                );
-            }
-
+        if (!openrouterResponse.ok) {
+            const errorText = await openrouterResponse.text();
+            console.error('OpenRouter API error:', errorText);
             return new Response(
                 JSON.stringify({
-                    error: 'Gemini API error',
+                    error: 'OpenRouter API error',
                     detail: errorText,
                 }),
                 { status: 500, headers: { 'Content-Type': 'application/json' } }
             );
         }
 
-        const data = await geminiResponse.json();
+        const data = await openrouterResponse.json();
 
         const replyText =
-            data?.candidates?.[0]?.content?.parts
-                ?.map((p: any) => p.text || '')
-                .join(' ')
-                .trim() || 'I could not generate a response.';
+            data?.choices?.[0]?.message?.content ||
+            'I could not generate a response.';
 
         return new Response(
             JSON.stringify({ reply: replyText }),
