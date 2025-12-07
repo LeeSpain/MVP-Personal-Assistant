@@ -21,6 +21,8 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [status, setStatus] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
     const [isMuted, setIsMuted] = useState(false);
+    const [view, setView] = useState<'visualizer' | 'chat'>('visualizer');
+    const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const lastMessageIdRef = useRef<string | null>(null);
 
@@ -45,6 +47,7 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
             stream.getTracks().forEach(track => track.stop());
             setStream(null);
             setIsMuted(false); // Reset mute state on close
+            setView('visualizer'); // Reset view on close
         }
     }, [isOpen, stream]);
 
@@ -74,6 +77,13 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
         }
     }, [messages, language, speak]);
 
+    // Scroll to bottom of chat
+    useEffect(() => {
+        if (view === 'chat') {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }
+    }, [messages, view]);
+
     const toggleMute = () => {
         if (stream) {
             const audioTrack = stream.getAudioTracks()[0];
@@ -99,39 +109,86 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
             {/* Close Button */}
             <button
                 onClick={onClose}
-                className="absolute top-6 right-6 text-slate-400 hover:text-white"
+                className="absolute top-6 right-6 text-slate-400 hover:text-white z-50"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
             </button>
 
-            {/* Status Text */}
-            <div className="mb-12 text-center space-y-2">
-                <h2 className="text-2xl font-light text-slate-100 tracking-wider uppercase">
-                    {isMuted ? 'MUTED' : t(`voice.${status}` as any)}
-                </h2>
-                {transcript && !isMuted && (
-                    <p className="text-slate-400 text-lg italic max-w-md mx-auto">
-                        &quot;{transcript}&quot;
-                    </p>
+            {/* View Toggle */}
+            <div className="absolute top-6 left-6 z-50">
+                <button
+                    onClick={() => setView(view === 'visualizer' ? 'chat' : 'visualizer')}
+                    className="bg-slate-800 text-slate-300 hover:text-white px-4 py-2 rounded-full text-sm font-medium transition-colors border border-slate-700"
+                >
+                    {view === 'visualizer' ? 'Show Chat' : 'Show Visualizer'}
+                </button>
+            </div>
+
+            {/* Content Area */}
+            <div className="flex-1 w-full max-w-2xl flex flex-col items-center justify-center relative">
+
+                {view === 'visualizer' ? (
+                    <>
+                        {/* Status Text */}
+                        <div className="mb-12 text-center space-y-2">
+                            <h2 className="text-2xl font-light text-slate-100 tracking-wider uppercase">
+                                {isMuted ? 'MUTED' : t(`voice.${status}` as any)}
+                            </h2>
+                            {transcript && !isMuted && (
+                                <p className="text-slate-400 text-lg italic max-w-md mx-auto">
+                                    &quot;{transcript}&quot;
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Visualizer */}
+                        <div className="w-64 h-64 relative flex items-center justify-center">
+                            {/* Glow Effect */}
+                            <div className={`absolute inset-0 bg-violet-500 rounded-full blur-3xl opacity-20 transition-opacity duration-500 ${status === 'speaking' ? 'opacity-40' : ''}`}></div>
+
+                            <AudioVisualizer
+                                stream={stream}
+                                isActive={!isMuted}
+                                color={status === 'speaking' ? '#34d399' : '#8b5cf6'} // Green for AI, Violet for User
+                            />
+                        </div>
+                    </>
+                ) : (
+                    /* Chat View */
+                    <div className="w-full h-[60vh] bg-slate-900/50 rounded-2xl border border-slate-800 p-4 overflow-y-auto custom-scrollbar">
+                        <div className="space-y-4">
+                            {messages.map((m) => (
+                                <div
+                                    key={m.id}
+                                    className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+                                >
+                                    <div
+                                        className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${m.role === "user"
+                                                ? "bg-violet-600 text-white"
+                                                : "bg-slate-800 text-slate-100"
+                                            }`}
+                                    >
+                                        {m.content}
+                                    </div>
+                                </div>
+                            ))}
+                            {transcript && !isMuted && (
+                                <div className="flex justify-end">
+                                    <div className="max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed bg-violet-600/50 text-white/70 italic">
+                                        {transcript}...
+                                    </div>
+                                </div>
+                            )}
+                            <div ref={messagesEndRef} />
+                        </div>
+                    </div>
                 )}
             </div>
 
-            {/* Visualizer */}
-            <div className="w-64 h-64 relative flex items-center justify-center">
-                {/* Glow Effect */}
-                <div className={`absolute inset-0 bg-violet-500 rounded-full blur-3xl opacity-20 transition-opacity duration-500 ${status === 'speaking' ? 'opacity-40' : ''}`}></div>
-
-                <AudioVisualizer
-                    stream={stream}
-                    isActive={!isMuted}
-                    color={status === 'speaking' ? '#34d399' : '#8b5cf6'} // Green for AI, Violet for User
-                />
-            </div>
-
             {/* Controls */}
-            <div className="mt-16 flex gap-6">
+            <div className="mt-8 flex gap-6 z-50">
                 {/* Mute Button */}
                 <button
                     onClick={toggleMute}
