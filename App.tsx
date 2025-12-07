@@ -477,16 +477,13 @@ const App: React.FC = () => {
   const handleSendMessage = async (content: string) => {
     if (!content || !content.trim()) return;
 
-    // Show the user message immediately
     setChatMessages((prev) => [
       ...prev,
       { role: 'user', content, id: crypto.randomUUID(), timestamp: new Date() },
     ]);
 
-    setIsProcessing(true);
-
     try {
-      const response = await fetch('/api/chat', {
+      const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -494,25 +491,17 @@ const App: React.FC = () => {
             ...chatMessages,
             { role: 'user', content },
           ],
-          context: null,
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('API /api/chat error:', errorData);
+      const data = await res.json();
 
-        const detail =
-          (errorData && (errorData.detail || errorData.error)) ||
-          'Unknown internal error.';
-
+      if (!res.ok) {
         setChatMessages((prev) => [
           ...prev,
           {
             role: 'assistant',
-            content:
-              'Sorry, I had an internal error and could not respond right now. Details: ' +
-              detail,
+            content: 'Internal error: ' + (data.detail || data.error),
             id: crypto.randomUUID(),
             timestamp: new Date()
           },
@@ -520,32 +509,25 @@ const App: React.FC = () => {
         return;
       }
 
-      const data = await response.json();
-      console.log('API /api/chat response:', data);
-
       setChatMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content: data.reply || '(empty reply)',
+          content: data.reply || '(no reply)',
           id: crypto.randomUUID(),
           timestamp: new Date()
         },
       ]);
     } catch (err) {
-      console.error('handleSendMessage network error:', err);
       setChatMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content:
-            'Network error talking to the assistant. Please check your connection.',
+          content: 'Network error talking to the assistant.',
           id: crypto.randomUUID(),
           timestamp: new Date()
         },
       ]);
-    } finally {
-      setIsProcessing(false);
     }
   };
 
