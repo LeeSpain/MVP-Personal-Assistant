@@ -130,7 +130,14 @@ const App: React.FC = () => {
     };
   } | null>(null);
 
-  const { messages: chatMessages, setMessages: setChatMessages } = useChat();
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+    {
+      role: 'assistant',
+      content: "Hi, I'm your personal assistant. How can I help you today?",
+      id: 'welcome-msg',
+      timestamp: new Date().toISOString()
+    },
+  ]);
   const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isVoiceModeOpen, setIsVoiceModeOpen] = useState(false);
@@ -477,13 +484,14 @@ const App: React.FC = () => {
   const handleSendMessage = async (content: string) => {
     if (!content || !content.trim()) return;
 
+    // 1. Show user message immediately
     setChatMessages((prev) => [
       ...prev,
-      { role: 'user', content, id: crypto.randomUUID(), timestamp: new Date() },
+      { role: 'user', content, id: crypto.randomUUID(), timestamp: new Date().toISOString() },
     ]);
 
     try {
-      const res = await fetch('/api/chat', {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -494,16 +502,18 @@ const App: React.FC = () => {
         }),
       });
 
-      const data = await res.json();
+      const data = await response.json();
 
-      if (!res.ok) {
+      if (!response.ok) {
+        console.error('API /api/chat error:', data);
         setChatMessages((prev) => [
           ...prev,
           {
             role: 'assistant',
-            content: 'Internal error: ' + (data.detail || data.error),
+            content:
+              'Internal error: ' + (data.detail || data.error || 'Unknown error'),
             id: crypto.randomUUID(),
-            timestamp: new Date()
+            timestamp: new Date().toISOString()
           },
         ]);
         return;
@@ -513,19 +523,21 @@ const App: React.FC = () => {
         ...prev,
         {
           role: 'assistant',
-          content: data.reply || '(no reply)',
+          content: data.reply || '(no reply from assistant)',
           id: crypto.randomUUID(),
-          timestamp: new Date()
+          timestamp: new Date().toISOString()
         },
       ]);
     } catch (err) {
+      console.error('handleSendMessage network error:', err);
       setChatMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content: 'Network error talking to the assistant.',
+          content:
+            'Network error talking to the assistant. Please check your connection.',
           id: crypto.randomUUID(),
-          timestamp: new Date()
+          timestamp: new Date().toISOString()
         },
       ]);
     }

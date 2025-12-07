@@ -42,8 +42,9 @@ export async function POST(req: Request) {
 
         const prompt = `${SYSTEM_PROMPT}\n\nConversation so far:\n${conversationText}\n\nASSISTANT:`;
 
+        // IMPORTANT: use a valid model name WITHOUT "-latest"
         const geminiResponse = await fetch(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=' +
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' +
             apiKey,
             {
                 method: 'POST',
@@ -76,8 +77,10 @@ export async function POST(req: Request) {
         const data = await geminiResponse.json();
 
         const replyText =
-            data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-            'I could not generate a response.';
+            data?.candidates?.[0]?.content?.parts
+                ?.map((p: any) => p.text || '')
+                .join(' ')
+                .trim() || 'I could not generate a response.';
 
         return new Response(
             JSON.stringify({ reply: replyText }),
