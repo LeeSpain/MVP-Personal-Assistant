@@ -23,7 +23,7 @@ export async function POST(req: Request) {
 
         // Simple AI call with NO database, NO sessions, NO memory, NO Prisma
         const response = await generateText({
-            model: google('gemini-1.5-flash-001'),
+            model: google('gemini-1.5-pro'),
             system: SYSTEM_PROMPT,
             messages: convertToCoreMessages(messages),
         });
