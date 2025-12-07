@@ -21,6 +21,10 @@ export async function POST(req: Request) {
         }
 
         const apiKey = process.env.OPENROUTER_API_KEY;
+        console.log(
+            'DEBUG OPENROUTER_API_KEY value:',
+            apiKey ? '[PRESENT, length=' + apiKey.length + ']' : '[MISSING]'
+        );
         if (!apiKey) {
             return new Response(
                 JSON.stringify({ error: 'OPENROUTER_API_KEY is not set' }),
