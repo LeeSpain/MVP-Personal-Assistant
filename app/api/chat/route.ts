@@ -2,6 +2,7 @@ import { SYSTEM_PROMPT } from '../ai/chat/systemPrompt';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
+export const runtime = 'nodejs';
 
 type ChatMessage = {
     role: 'user' | 'assistant' | 'system';
@@ -21,13 +22,19 @@ export async function POST(req: Request) {
         }
 
         const apiKey = process.env.OPENROUTER_API_KEY;
-        console.log(
-            'DEBUG OPENROUTER_API_KEY value:',
-            apiKey ? '[PRESENT, length=' + apiKey.length + ']' : '[MISSING]'
-        );
+        console.log('DEBUG: Full Environment Keys:', Object.keys(process.env));
+        console.log('DEBUG: OPENROUTER_API_KEY value:', apiKey);
+
         if (!apiKey) {
             return new Response(
-                JSON.stringify({ error: 'OPENROUTER_API_KEY is not set' }),
+                JSON.stringify({
+                    error: 'OPENROUTER_API_KEY is not set',
+                    debug_info: {
+                        message: 'The environment variable OPENROUTER_API_KEY is missing or empty.',
+                        available_env_keys: Object.keys(process.env),
+                        runtime: process.release?.name || 'unknown'
+                    }
+                }),
                 { status: 500, headers: { 'Content-Type': 'application/json' } }
             );
         }
