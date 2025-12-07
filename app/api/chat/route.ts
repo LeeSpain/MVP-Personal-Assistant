@@ -1,8 +1,5 @@
 // Local-only chat route with a built-in "context engine" and four independent pillars.
-// Now uses PillarSetting from the database via Prisma + getOrCreateDefaultUser.
-
-import { prisma } from '@/lib/prisma';
-import { getOrCreateDefaultUser } from '@/lib/user';
+// NO DATABASE, NO PRISMA, NO EXTERNAL AI. Safe, free, and self-contained.
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -65,7 +62,7 @@ type AgentContext = {
 };
 
 // ------------------
-// Behaviour description (internal)
+// Behaviour description (internal, not sent anywhere yet)
 // ------------------
 
 const BEHAVIOUR_DESCRIPTION = `
@@ -75,7 +72,6 @@ You:
 - Speak in plain text, no markdown.
 - Keep answers short, clear, and friendly.
 - Use any context you are given (meetings, focus items, diary, summaries, goals, pillars).
-- Never say "I cannot access your calendar" if meetings are provided in context.
 - Treat each pillar (Deep Work, Execution, Relationship, Recovery) as independent, with its own settings.
 - If there is no data for something, you say that honestly but helpfully.
 `;
@@ -203,7 +199,7 @@ function planDayFromContext(
 }
 
 // ------------------
-// Pillars helpers
+// Pillars helpers (Deep Work / Execution / Relationship / Recovery)
 // ------------------
 
 function buildDefaultPillars(): PillarMap {
@@ -241,31 +237,6 @@ function buildDefaultPillars(): PillarMap {
                 'Rest, movement, sleep, and activities that recharge your energy and prevent burnout.',
         },
     };
-}
-
-function mergePillars(
-    defaults: PillarMap,
-    dbPillars: PillarSetting[]
-): PillarMap {
-    const result: PillarMap = { ...defaults };
-    for (const p of dbPillars) {
-        if (!['deepWork', 'execution', 'relationship', 'recovery'].includes(p.key)) {
-            continue;
-        }
-        const key = p.key as PillarKey;
-        result[key] = {
-            key,
-            name: p.name || defaults[key].name,
-            enabled:
-                typeof p.enabled === 'boolean' ? p.enabled : defaults[key].enabled,
-            dailyTargetMinutes:
-                p.dailyTargetMinutes !== undefined
-                    ? p.dailyTargetMinutes
-                    : defaults[key].dailyTargetMinutes,
-            description: p.description ?? defaults[key].description,
-        };
-    }
-    return result;
 }
 
 function describePillar(pillar: PillarSetting): string {
@@ -362,7 +333,7 @@ function suggestForPillar(
 }
 
 // ------------------
-// Fake schedule context (we'll later replace with real data)
+// Fake schedule/context (no DB, no APIs)
 // ------------------
 
 function makeISO(hoursFromNow: number): string {
@@ -378,7 +349,8 @@ function makeISOInDays(dayOffset: number, hour: number): string {
     return d.toISOString();
 }
 
-async function buildBaseContext(): Promise<Omit<AgentContext, 'pillars'>> {
+// Build in-memory context (later we can replace this with real data when ready)
+function buildContextFromSources(): AgentContext {
     const todaysMeetings: Meeting[] = [
         {
             title: 'Morning focus block',
@@ -437,6 +409,8 @@ async function buildBaseContext(): Promise<Omit<AgentContext, 'pillars'>> {
     const weeklySummary =
         'This week is about balancing deep work, getting things done, staying connected, and not burning out.';
 
+    const pillars = buildDefaultPillars();
+
     return {
         todaysMeetings,
         thisWeeksMeetings,
@@ -445,35 +419,9 @@ async function buildBaseContext(): Promise<Omit<AgentContext, 'pillars'>> {
         goals,
         dailySummary,
         weeklySummary,
+        pillars,
         activePillar: null,
     };
-}
-
-// ------------------
-// Load pillars from DB
-// ------------------
-
-async function loadPillarsForUser(userId: string): Promise<PillarMap> {
-    const defaults = buildDefaultPillars();
-
-    const dbPillars = await prisma.pillarSetting.findMany({
-        where: { userId },
-    });
-
-    if (dbPillars.length === 0) {
-        return defaults;
-    }
-
-    return mergePillars(
-        defaults,
-        dbPillars.map((p) => ({
-            key: p.key as PillarKey,
-            name: p.name,
-            enabled: p.enabled,
-            dailyTargetMinutes: p.dailyTargetMinutes,
-            description: p.description,
-        }))
-    );
 }
 
 // ------------------
@@ -629,15 +577,14 @@ export async function POST(req: Request) {
             );
         }
 
-        const user = await getOrCreateDefaultUser();
+        // Build server-side context from our local fake sources
+        const baseContext = buildContextFromSources();
 
-        const baseContext = await buildBaseContext();
-        const pillars = await loadPillarsForUser(user.id);
-
+        // If the frontend sends extra context, merge it on top
         const mergedContext: AgentContext =
             context && typeof context === 'object'
-                ? { ...baseContext, ...context, pillars }
-                : { ...baseContext, pillars };
+                ? { ...baseContext, ...context }
+                : baseContext;
 
         const userText = getLastUserMessage(messages as ChatMessage[]);
         const reply = generateLocalReply(userText, mergedContext);
