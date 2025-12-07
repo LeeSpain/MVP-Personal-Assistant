@@ -9,7 +9,7 @@ export interface SpeechRecognitionHook {
     hasRecognitionSupport: boolean;
 }
 
-export const useSpeechRecognition = (): SpeechRecognitionHook => {
+export const useSpeechRecognition = (language: string = 'en-US'): SpeechRecognitionHook => {
     const [isListening, setIsListening] = useState(false);
     const [transcript, setTranscript] = useState('');
     const [hasRecognitionSupport, setHasRecognitionSupport] = useState(false);
@@ -25,7 +25,7 @@ export const useSpeechRecognition = (): SpeechRecognitionHook => {
                 const recognition = new SpeechRecognition();
                 recognition.continuous = false; // Stop after one sentence for simple chat
                 recognition.interimResults = true;
-                recognition.lang = 'en-US';
+                recognition.lang = language;
 
                 recognition.onstart = () => {
                     setIsListening(true);

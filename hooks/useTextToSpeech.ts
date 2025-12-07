@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 
 export interface TextToSpeechHook {
-    speak: (text: string) => void;
+    speak: (text: string, language?: string) => void;
     cancel: () => void;
     isSpeaking: boolean;
     hasSupport: boolean;
@@ -19,17 +19,18 @@ export const useTextToSpeech = (): TextToSpeechHook => {
         }
     }, []);
 
-    const speak = (text: string) => {
+    const speak = (text: string, language: string = 'en-US') => {
         if (!synthRef.current) return;
 
         // Cancel any ongoing speech
         synthRef.current.cancel();
 
         const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = language;
 
         // Optional: Select a better voice if available (e.g., Google US English)
         const voices = synthRef.current.getVoices();
-        const preferredVoice = voices.find(v => v.name.includes('Google') && v.lang.includes('en-US')) || voices[0];
+        const preferredVoice = voices.find(v => v.name.includes('Google') && v.lang.includes(language)) || voices.find(v => v.lang.includes(language)) || voices[0];
         if (preferredVoice) utterance.voice = preferredVoice;
 
         utterance.onstart = () => setIsSpeaking(true);

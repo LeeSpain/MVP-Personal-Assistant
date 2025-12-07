@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import AudioVisualizer from './AudioVisualizer';
+import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
+import { useTextToSpeech } from '../hooks/useTextToSpeech';
 import { ChatMessage } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -13,52 +15,24 @@ interface VoiceModeProps {
 
 export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, isProcessing }: VoiceModeProps) {
     const { t, language } = useLanguage();
-    const [isListening, setIsListening] = useState(false);
-    const [transcript, setTranscript] = useState('');
+    const { isListening, transcript, startListening, stopListening } = useSpeechRecognition(language === 'nl' ? 'nl-NL' : 'en-US');
+    const { speak, isSpeaking } = useTextToSpeech();
+
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [status, setStatus] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
 
-    const recognitionRef = useRef<any>(null);
-    const synthRef = useRef<SpeechSynthesis | null>(null);
     const lastMessageIdRef = useRef<string | null>(null);
 
-    // 1. Init Speech Recognition & Synthesis
+    // 1. Sync status with hooks
     useEffect(() => {
-        if (typeof window !== 'undefined') {
-            // STT
-            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-            if (SpeechRecognition) {
-                const recognition = new SpeechRecognition();
-                recognition.continuous = false; // Stop after one sentence for turn-taking
-                recognition.interimResults = true;
-                recognition.lang = language === 'nl' ? 'nl-NL' : 'en-US';
-
-                recognition.onstart = () => {
-                    setIsListening(true);
-                    setStatus('listening');
-                };
-
-                recognition.onresult = (event: any) => {
-                    const current = event.resultIndex;
-                    const transcriptText = event.results[current][0].transcript;
-                    setTranscript(transcriptText);
-                };
-
-                recognition.onend = () => {
-                    setIsListening(false);
-                    // If we have a transcript, send it!
-                    // We need to access the LATEST transcript state, which might be stale in closure.
-                    // But here we can rely on the fact that we'll handle "send" logic separately or check transcript ref if needed.
-                    // For simplicity, let's trigger send in a separate effect or check transcript here.
-                };
-
-                recognitionRef.current = recognition;
-            }
-
-            // TTS
-            synthRef.current = window.speechSynthesis;
+        if (isSpeaking) {
+            setStatus('speaking');
+        } else if (isListening) {
+            setStatus('listening');
+        } else if (status === 'speaking' || status === 'listening') {
+            setStatus('idle');
         }
-    }, [language]);
+    }, [isListening, isSpeaking]);
 
     // 2. Handle Microphone Stream for Visualizer
     useEffect(() => {
@@ -74,23 +48,17 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
 
     // 3. Auto-start listening when open (or after speaking)
     useEffect(() => {
-        if (isOpen && !isProcessing && status === 'idle' && recognitionRef.current && !isListening) {
-            try {
-                recognitionRef.current.start();
-            } catch (e) {
-                // Already started
-            }
+        if (isOpen && !isProcessing && status === 'idle' && !isListening && !isSpeaking) {
+            startListening();
         }
-    }, [isOpen, isProcessing, status, isListening]);
+    }, [isOpen, isProcessing, status, isListening, isSpeaking]);
 
     // 4. Handle Sending Message
     useEffect(() => {
-        if (!isListening && transcript && status !== 'thinking') {
+        if (!isListening && transcript && status !== 'thinking' && status !== 'speaking') {
             // Recognition ended and we have text
             setStatus('thinking');
-            onSendMessage(transcript).then(() => {
-                setTranscript('');
-            });
+            onSendMessage(transcript);
         }
     }, [isListening, transcript]);
 
@@ -99,17 +67,7 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
         const lastMsg = messages[messages.length - 1];
         if (lastMsg && lastMsg.role === 'assistant' && lastMsg.id !== lastMessageIdRef.current) {
             lastMessageIdRef.current = lastMsg.id;
-            setStatus('speaking');
-
-            // Speak
-            if (synthRef.current) {
-                const utterance = new SpeechSynthesisUtterance(lastMsg.content);
-                utterance.lang = language === 'nl' ? 'nl-NL' : 'en-US';
-                utterance.onend = () => {
-                    setStatus('idle'); // Go back to listening
-                };
-                synthRef.current.speak(utterance);
-            }
+            speak(lastMsg.content, language === 'nl' ? 'nl-NL' : 'en-US');
         }
     }, [messages]);
 
@@ -156,8 +114,8 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
             <div className="mt-16 flex gap-6">
                 <button
                     onClick={() => {
-                        if (isListening) recognitionRef.current?.stop();
-                        else recognitionRef.current?.start();
+                        if (isListening) stopListening();
+                        else startListening();
                     }}
                     className={`p-4 rounded-full transition-all ${isListening ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
                 >
