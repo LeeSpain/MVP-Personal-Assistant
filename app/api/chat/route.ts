@@ -1,5 +1,8 @@
-// Local-only chat route: no external AI, no env variables.
-// Smarter rule-based logic using context.
+// Local-only chat route with a built-in "context engine".
+// No external AI, no env vars. Uses a generated default context
+// (fake meetings, focus items, goals, summaries) so the agent
+// feels more real. Later we can swap the context builder to use
+// real APIs (Google Calendar, tasks, etc).
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -37,8 +40,18 @@ type Goal = {
     horizon?: 'today' | 'week' | 'month' | 'year' | string;
 };
 
+type AgentContext = {
+    todaysMeetings: Meeting[];
+    thisWeeksMeetings: Meeting[];
+    focusItems: FocusItem[];
+    recentDiary: DiaryEntry[];
+    goals: Goal[];
+    dailySummary: string | null;
+    weeklySummary: string | null;
+};
+
 // ------------------
-// "System prompt" (behaviour description)
+// "Behaviour description" (internal)
 // ------------------
 
 const BEHAVIOUR_DESCRIPTION = `
@@ -53,7 +66,7 @@ You:
 `;
 
 // ------------------
-// Helpers
+// Utility helpers
 // ------------------
 
 function extractText(content: any): string {
@@ -175,29 +188,119 @@ function planDayFromContext(
 }
 
 // ------------------
+// Context engine (temporary fake data)
+// ------------------
+
+function makeISO(hoursFromNow: number): string {
+    const d = new Date();
+    d.setHours(d.getHours() + hoursFromNow, 0, 0, 0);
+    return d.toISOString();
+}
+
+function makeISOInDays(dayOffset: number, hour: number): string {
+    const d = new Date();
+    d.setDate(d.getDate() + dayOffset);
+    d.setHours(hour, 0, 0, 0);
+    return d.toISOString();
+}
+
+// This is where we will later plug real data from:
+// - Google Calendar
+// - DB (Prisma) for diary, focus, goals
+// - Other platforms from "Settings"
+async function buildContextFromSources(): Promise<AgentContext> {
+    // Fake "today" meetings
+    const todaysMeetings: Meeting[] = [
+        {
+            title: 'Check-in with yourself',
+            description: 'Short review of priorities and energy.',
+            startTime: makeISO(1),
+            endTime: makeISO(2),
+        },
+        {
+            title: 'Focus block',
+            description: 'Deep work on your main task.',
+            startTime: makeISO(3),
+            endTime: makeISO(5),
+        },
+    ];
+
+    // Fake "this week" meetings
+    const thisWeeksMeetings: Meeting[] = [
+        ...todaysMeetings,
+        {
+            title: 'Planning the week ahead',
+            description: 'Review goals and adjust schedule.',
+            startTime: makeISOInDays(2, 10),
+            endTime: makeISOInDays(2, 11),
+        },
+        {
+            title: 'Catch-up with key contact',
+            description: 'Conversation about progress and ideas.',
+            startTime: makeISOInDays(3, 15),
+            endTime: makeISOInDays(3, 16),
+        },
+    ];
+
+    const focusItems: FocusItem[] = [
+        { title: 'Clarify your top 3 priorities', status: 'in-progress' },
+        { title: 'Work on your main project for 90 minutes', status: 'planned' },
+        { title: 'Review and clean up your inbox/tasks', status: 'optional' },
+    ];
+
+    const recentDiary: DiaryEntry[] = [
+        {
+            title: 'Yesterday’s reflection',
+            content:
+                'Felt a bit overwhelmed but made progress on the main project. Need to be clearer about what matters tomorrow.',
+            createdAt: new Date().toISOString(),
+        },
+    ];
+
+    const goals: Goal[] = [
+        { title: 'Stabilise your weekly routine', horizon: 'week' },
+        { title: 'Move your main project noticeably forward', horizon: 'week' },
+        { title: 'Make time for at least one break outside each day', horizon: 'today' },
+    ];
+
+    const dailySummary =
+        'Today is about focusing on one or two important tasks, protecting your focus block, and not overloading your schedule.';
+    const weeklySummary =
+        'This week is about stabilising your routine, making steady progress on your main project, and avoiding burnout.';
+
+    return {
+        todaysMeetings,
+        thisWeeksMeetings,
+        focusItems,
+        recentDiary,
+        goals,
+        dailySummary,
+        weeklySummary,
+    };
+}
+
+// ------------------
 // Main local brain
 // ------------------
 
-function generateLocalReply(userText: string, rawContext: any): string {
-    const context = rawContext && typeof rawContext === 'object' ? rawContext : {};
-
-    const todaysMeetings: Meeting[] = context.todaysMeetings || [];
-    const thisWeeksMeetings: Meeting[] =
-        context.thisWeeksMeetings || context.weekMeetings || [];
-    const focusItems: FocusItem[] = context.focusItems || [];
-    const diaryEntries: DiaryEntry[] = context.recentDiary || [];
-    const goals: Goal[] = context.goals || [];
-    const dailySummary: string | null = context.dailySummary || null;
-    const weeklySummary: string | null = context.weeklySummary || null;
+function generateLocalReply(userText: string, ctx: AgentContext): string {
+    const {
+        todaysMeetings,
+        thisWeeksMeetings,
+        focusItems,
+        recentDiary,
+        goals,
+        dailySummary,
+        weeklySummary,
+    } = ctx;
 
     const lower = userText.toLowerCase();
 
-    // 0) If user says nothing useful
     if (!userText || userText.trim().length === 0) {
         return 'I’m here and ready. Tell me what you want to check, plan, or figure out.';
     }
 
-    // 1) Greetings / small talk
+    // Greetings / small talk
     if (
         lower === 'hi' ||
         lower === 'hello' ||
@@ -211,7 +314,7 @@ function generateLocalReply(userText: string, rawContext: any): string {
         return 'I’m doing fine and ready to help. What do you want to focus on today?';
     }
 
-    // 2) Appointments / meetings / schedule
+    // Appointments / meetings / schedule
     if (
         lower.includes('appointment') ||
         lower.includes('appointments') ||
@@ -229,7 +332,7 @@ function generateLocalReply(userText: string, rawContext: any): string {
         return summarizeMeetings('upcoming', combined);
     }
 
-    // 3) Focus / tasks / goals
+    // Focus / tasks / goals
     if (
         lower.includes('focus') ||
         lower.includes('task') ||
@@ -239,29 +342,28 @@ function generateLocalReply(userText: string, rawContext: any): string {
         lower.includes('goal') ||
         lower.includes('goals')
     ) {
-        // If clearly asking about goals
         if (lower.includes('goal') || lower.includes('goals')) {
             return summarizeGoals(goals);
         }
         return summarizeFocus(focusItems);
     }
 
-    // 4) Daily / weekly summaries
+    // Daily / weekly summaries
     if (lower.includes('today') && lower.includes('summary')) {
         if (dailySummary) {
-            return `Here’s your current daily summary from context: ${dailySummary}`;
+            return `Here’s your current daily summary: ${dailySummary}`;
         }
         return 'I don’t see a daily summary in your context yet. If you tell me how your day went, I can help you turn it into one.';
     }
 
     if (lower.includes('week') && lower.includes('summary')) {
         if (weeklySummary) {
-            return `Here’s your current weekly summary from context: ${weeklySummary}`;
+            return `Here’s your current weekly summary: ${weeklySummary}`;
         }
         return 'I don’t see a weekly summary in your context yet. We can create one together if you tell me the main things that happened.';
     }
 
-    // 5) "Plan my day / week" type queries
+    // Plan my day / week
     if (
         (lower.includes('plan') || lower.includes('planning')) &&
         (lower.includes('day') || lower.includes('today'))
@@ -277,19 +379,19 @@ function generateLocalReply(userText: string, rawContext: any): string {
         if (combined.length === 0 && goals.length === 0) {
             return 'I don’t see any meetings or goals in your context for this week yet. If you tell me what you want your week to look like, I can help you sketch out a simple plan.';
         }
-        return 'For this week, focus on keeping your main meetings in view and picking one or two important tasks or goals each day. If you want, tell me what’s coming up and I’ll help you break it down day by day.';
+        return 'For this week, keep your main meetings in view and pick one or two important tasks or goals each day. If you want, tell me what’s coming up and I’ll help you break it down day by day.';
     }
 
-    // 6) Diary / reflection questions
+    // Diary / reflection
     if (
         lower.includes('diary') ||
         lower.includes('journal') ||
         lower.includes('reflection')
     ) {
-        return summarizeDiary(diaryEntries);
+        return summarizeDiary(recentDiary);
     }
 
-    // 7) Generic fallback – but more natural
+    // Fallback
     return `Okay, I’ve got your message: "${userText}". Based on the current context I can help you review your schedule, focus items, goals, or recent entries, or we can just think through your plans. What would you like to look at next?`;
 }
 
@@ -309,15 +411,19 @@ export async function POST(req: Request) {
             );
         }
 
-        const userText = getLastUserMessage(messages as ChatMessage[]);
-        const reply = generateLocalReply(userText, context);
+        // Build server-side context from our fake sources
+        const serverContext = await buildContextFromSources();
 
-        const finalReply = reply.startsWith('Okay, I’ve got your message:')
-            ? reply
-            : `${reply}`;
+        // If the frontend sends a context object, we merge it on top
+        const mergedContext: AgentContext = context && typeof context === 'object'
+            ? { ...serverContext, ...context }
+            : serverContext;
+
+        const userText = getLastUserMessage(messages as ChatMessage[]);
+        const reply = generateLocalReply(userText, mergedContext);
 
         return new Response(
-            JSON.stringify({ reply: finalReply }),
+            JSON.stringify({ reply }),
             { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
     } catch (err: any) {
