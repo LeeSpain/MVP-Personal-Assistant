@@ -1,8 +1,6 @@
-// Local-only chat route with a built-in "context engine".
-// No external AI, no env vars. Uses a generated default context
-// (fake meetings, focus items, goals, summaries) so the agent
-// feels more real. Later we can swap the context builder to use
-// real APIs (Google Calendar, tasks, etc).
+// Local-only chat route with a built-in "context engine" and four independent pillars:
+// Deep Work, Execution, Relationship, Recovery.
+// No external AI, no env vars. All behaviour is rule-based for now.
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,6 +38,18 @@ type Goal = {
     horizon?: 'today' | 'week' | 'month' | 'year' | string;
 };
 
+type PillarKey = 'deepWork' | 'execution' | 'relationship' | 'recovery';
+
+type PillarSetting = {
+    key: PillarKey;
+    name: string;
+    enabled: boolean;
+    dailyTargetMinutes?: number;
+    description?: string;
+};
+
+type PillarMap = Record<PillarKey, PillarSetting>;
+
 type AgentContext = {
     todaysMeetings: Meeting[];
     thisWeeksMeetings: Meeting[];
@@ -48,10 +58,12 @@ type AgentContext = {
     goals: Goal[];
     dailySummary: string | null;
     weeklySummary: string | null;
+    pillars: PillarMap;
+    activePillar?: PillarKey | null;
 };
 
 // ------------------
-// "Behaviour description" (internal)
+// Behaviour description (internal)
 // ------------------
 
 const BEHAVIOUR_DESCRIPTION = `
@@ -60,8 +72,9 @@ You are a warm, natural personal assistant.
 You:
 - Speak in plain text, no markdown.
 - Keep answers short, clear, and friendly.
-- Use any context you are given (meetings, focus items, diary, summaries, goals).
+- Use any context you are given (meetings, focus items, diary, summaries, goals, pillars).
 - Never say "I cannot access your calendar" if meetings are provided in context.
+- Treat each pillar (Deep Work, Execution, Relationship, Recovery) as independent, with its own settings.
 - If there is no data for something, you say that honestly but helpfully.
 `;
 
@@ -169,7 +182,7 @@ function planDayFromContext(
     if (focusItems && focusItems.length > 0) {
         const firstFocus = focusItems[0];
         parts.push(
-            `A good focus task would be: ${firstFocus.title || 'a main task you’ve set'}, especially to keep momentum.`
+            `A good work block would be: ${firstFocus.title || 'a main task you’ve set'}, especially to keep momentum.`
         );
     }
 
@@ -185,6 +198,140 @@ function planDayFromContext(
     }
 
     return parts.join(' ');
+}
+
+// ------------------
+// Pillars: Deep Work / Execution / Relationship / Recovery
+// ------------------
+
+function buildDefaultPillars(): PillarMap {
+    return {
+        deepWork: {
+            key: 'deepWork',
+            name: 'Deep Work',
+            enabled: true,
+            dailyTargetMinutes: 120,
+            description:
+                'Long, focused blocks on your most important, cognitively demanding work with minimal interruptions.',
+        },
+        execution: {
+            key: 'execution',
+            name: 'Execution',
+            enabled: true,
+            dailyTargetMinutes: 90,
+            description:
+                'Getting through shorter tasks, admin, follow-ups, and concrete actions that move things forward.',
+        },
+        relationship: {
+            key: 'relationship',
+            name: 'Relationship',
+            enabled: true,
+            dailyTargetMinutes: 45,
+            description:
+                'Time spent maintaining and improving relationships, communication, and important conversations.',
+        },
+        recovery: {
+            key: 'recovery',
+            name: 'Recovery',
+            enabled: true,
+            dailyTargetMinutes: 60,
+            description:
+                'Rest, movement, sleep, and activities that recharge your energy and prevent burnout.',
+        },
+    };
+}
+
+function describePillar(pillar: PillarSetting): string {
+    const base = `${pillar.name} is currently ${pillar.enabled ? 'enabled' : 'disabled'
+        }.`;
+    const target =
+        pillar.dailyTargetMinutes && pillar.dailyTargetMinutes > 0
+            ? ` Your daily target for this is about ${pillar.dailyTargetMinutes} minutes.`
+            : '';
+    const desc = pillar.description
+        ? ` In simple terms: ${pillar.description}`
+        : '';
+    return base + target + desc;
+}
+
+function pillarFromText(text: string): PillarKey | null {
+    const lower = text.toLowerCase();
+
+    if (lower.includes('deep work') || lower.includes('deepwork')) {
+        return 'deepWork';
+    }
+    if (lower.includes('execution')) {
+        return 'execution';
+    }
+    if (
+        lower.includes('relationship') ||
+        lower.includes('relationships') ||
+        lower.includes('connection') ||
+        lower.includes('people')
+    ) {
+        return 'relationship';
+    }
+    if (
+        lower.includes('recovery') ||
+        lower.includes('rest') ||
+        lower.includes('recharge') ||
+        lower.includes('energy')
+    ) {
+        return 'recovery';
+    }
+
+    return null;
+}
+
+function suggestForPillar(
+    pillar: PillarSetting,
+    ctx: AgentContext
+): string {
+    const { focusItems, goals } = ctx;
+
+    if (!pillar.enabled) {
+        return `${pillar.name} is currently disabled in your settings. If you want to work on it, we can treat it as active for now and build a small plan.`;
+    }
+
+    switch (pillar.key) {
+        case 'deepWork': {
+            const mainGoal =
+                goals.find((g) => g.horizon === 'week' || g.horizon === 'month') ||
+                goals[0];
+
+            return (
+                describePillar(pillar) +
+                ' For a deep work block today, pick one important task or project and protect 60–90 minutes for it. ' +
+                (mainGoal
+                    ? `A good candidate would be something that moves this goal: "${mainGoal.title}".`
+                    : 'Choose the one thing that would make you feel genuinely satisfied if you made progress on it today.')
+            );
+        }
+        case 'execution': {
+            const executionFocus = focusItems[0];
+            return (
+                describePillar(pillar) +
+                ' For execution, choose 3–5 small, concrete tasks and clear them in a focused burst. ' +
+                (executionFocus
+                    ? `You could start with: "${executionFocus.title}".`
+                    : 'Look at your small admin tasks or follow-ups and bundle a few of them into one session.')
+            );
+        }
+        case 'relationship': {
+            return (
+                describePillar(pillar) +
+                ' For relationships, choose one person to check in with, or one relationship that would benefit from a bit of time or attention today. A call, a message, or a short conversation is enough to count.'
+            );
+        }
+        case 'recovery': {
+            return (
+                describePillar(pillar) +
+                ' For recovery, plan at least one real break where you step away from screens, move a little, or do something that helps your mind reset. Even 10–20 minutes makes a difference.'
+            );
+        }
+        default:
+            return describePillar(pillar);
+    }
 }
 
 // ------------------
@@ -204,23 +351,23 @@ function makeISOInDays(dayOffset: number, hour: number): string {
     return d.toISOString();
 }
 
-// This is where we will later plug real data from:
+// Later this will pull from:
 // - Google Calendar
-// - DB (Prisma) for diary, focus, goals
-// - Other platforms from "Settings"
+// - Prisma (diary, focus, goals)
+// - Other connected platforms
 async function buildContextFromSources(): Promise<AgentContext> {
     // Fake "today" meetings
     const todaysMeetings: Meeting[] = [
         {
-            title: 'Check-in with yourself',
-            description: 'Short review of priorities and energy.',
+            title: 'Morning focus block',
+            description: 'Deep work on your main project.',
             startTime: makeISO(1),
-            endTime: makeISO(2),
+            endTime: makeISO(3),
         },
         {
-            title: 'Focus block',
-            description: 'Deep work on your main task.',
-            startTime: makeISO(3),
+            title: 'Quick admin and emails',
+            description: 'Execution session for small tasks.',
+            startTime: makeISO(4),
             endTime: makeISO(5),
         },
     ];
@@ -229,44 +376,47 @@ async function buildContextFromSources(): Promise<AgentContext> {
     const thisWeeksMeetings: Meeting[] = [
         ...todaysMeetings,
         {
-            title: 'Planning the week ahead',
-            description: 'Review goals and adjust schedule.',
+            title: 'Weekly planning review',
+            description: 'Look over the week, goals, and upcoming tasks.',
             startTime: makeISOInDays(2, 10),
             endTime: makeISOInDays(2, 11),
         },
         {
-            title: 'Catch-up with key contact',
-            description: 'Conversation about progress and ideas.',
-            startTime: makeISOInDays(3, 15),
-            endTime: makeISOInDays(3, 16),
+            title: 'Catch-up call with an important person',
+            description: 'Relationship catch-up.',
+            startTime: makeISOInDays(3, 16),
+            endTime: makeISOInDays(3, 17),
         },
     ];
 
     const focusItems: FocusItem[] = [
-        { title: 'Clarify your top 3 priorities', status: 'in-progress' },
-        { title: 'Work on your main project for 90 minutes', status: 'planned' },
-        { title: 'Review and clean up your inbox/tasks', status: 'optional' },
+        { title: 'Main project deep work block', status: 'in-progress' },
+        { title: 'Clear admin tasks and emails', status: 'planned' },
+        { title: 'Message or call someone important', status: 'planned' },
     ];
 
     const recentDiary: DiaryEntry[] = [
         {
             title: 'Yesterday’s reflection',
             content:
-                'Felt a bit overwhelmed but made progress on the main project. Need to be clearer about what matters tomorrow.',
+                'Made some progress but felt pulled in different directions. Need clearer blocks for deep work and more intentional breaks.',
             createdAt: new Date().toISOString(),
         },
     ];
 
     const goals: Goal[] = [
-        { title: 'Stabilise your weekly routine', horizon: 'week' },
-        { title: 'Move your main project noticeably forward', horizon: 'week' },
-        { title: 'Make time for at least one break outside each day', horizon: 'today' },
+        { title: 'Move your main project forward consistently', horizon: 'week' },
+        { title: 'Keep your admin and execution under control', horizon: 'week' },
+        { title: 'Invest small but regular energy into key relationships', horizon: 'week' },
+        { title: 'Avoid burnout by adding real recovery time', horizon: 'week' },
     ];
 
     const dailySummary =
-        'Today is about focusing on one or two important tasks, protecting your focus block, and not overloading your schedule.';
+        'Today is about one deep work block, one execution burst, and at least a small step for relationships and recovery.';
     const weeklySummary =
-        'This week is about stabilising your routine, making steady progress on your main project, and avoiding burnout.';
+        'This week is about balancing deep work, getting things done, staying connected, and not burning out.';
+
+    const pillars = buildDefaultPillars();
 
     return {
         todaysMeetings,
@@ -276,6 +426,8 @@ async function buildContextFromSources(): Promise<AgentContext> {
         goals,
         dailySummary,
         weeklySummary,
+        pillars,
+        activePillar: null,
     };
 }
 
@@ -292,6 +444,8 @@ function generateLocalReply(userText: string, ctx: AgentContext): string {
         goals,
         dailySummary,
         weeklySummary,
+        pillars,
+        activePillar,
     } = ctx;
 
     const lower = userText.toLowerCase();
@@ -307,11 +461,33 @@ function generateLocalReply(userText: string, ctx: AgentContext): string {
         lower.startsWith('hi ') ||
         lower.startsWith('hello ')
     ) {
-        return 'Hey, I’m here. Do you want to look at your day, your week, or something else?';
+        return 'Hey, I’m here. Do you want to look at your day, your week, or one of the four areas: Deep Work, Execution, Relationship, or Recovery?';
     }
 
     if (lower.includes('how are you')) {
-        return 'I’m doing fine and ready to help. What do you want to focus on today?';
+        return 'I’m doing fine and ready to help. What do you want to focus on today? Deep Work, Execution, Relationship, or Recovery?';
+    }
+
+    // Pillar-specific questions (Deep Work / Execution / Relationship / Recovery)
+    const pillarKey = pillarFromText(userText);
+    if (pillarKey) {
+        const pillar = pillars[pillarKey];
+        if (!pillar) {
+            return 'That area is not configured yet in your context.';
+        }
+
+        // If they say "what should I do for deep work" or similar
+        if (
+            lower.includes('what should i do') ||
+            lower.includes('what to do') ||
+            lower.includes('plan') ||
+            lower.includes('help me with')
+        ) {
+            return suggestForPillar(pillar, ctx);
+        }
+
+        // Otherwise just describe that pillar's settings independently
+        return describePillar(pillar);
     }
 
     // Appointments / meetings / schedule
@@ -392,7 +568,7 @@ function generateLocalReply(userText: string, ctx: AgentContext): string {
     }
 
     // Fallback
-    return `Okay, I’ve got your message: "${userText}". Based on the current context I can help you review your schedule, focus items, goals, or recent entries, or we can just think through your plans. What would you like to look at next?`;
+    return `Okay, I’ve got your message: "${userText}". Based on the current context I can help you review your schedule, focus items, goals, or any of the four pillars (Deep Work, Execution, Relationship, Recovery), or we can just think through your plans. What would you like to look at next?`;
 }
 
 // ------------------
@@ -414,18 +590,19 @@ export async function POST(req: Request) {
         // Build server-side context from our fake sources
         const serverContext = await buildContextFromSources();
 
-        // If the frontend sends a context object, we merge it on top
-        const mergedContext: AgentContext = context && typeof context === 'object'
-            ? { ...serverContext, ...context }
-            : serverContext;
+        // If the frontend sends a context object, we merge it on top (so settings can be customised later)
+        const mergedContext: AgentContext =
+            context && typeof context === 'object'
+                ? { ...serverContext, ...context }
+                : serverContext;
 
         const userText = getLastUserMessage(messages as ChatMessage[]);
         const reply = generateLocalReply(userText, mergedContext);
 
-        return new Response(
-            JSON.stringify({ reply }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } }
-        );
+        return new Response(JSON.stringify({ reply }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+        });
     } catch (err: any) {
         console.error('LOCAL CHAT ROUTE ERROR:', err);
         return new Response(
