@@ -105,7 +105,7 @@ const App: React.FC = () => {
   const [isCommandProcessing, setIsCommandProcessing] = useState(false);
   const [lastCommandText, setLastCommandText] = useState<string | null>(null);
 
-  // const [isProcessing, setIsProcessing] = useState(false); // Replaced by useChat
+  const [isProcessing, setIsProcessing] = useState(false); // Replaced by useChat
 
   const [activeMobileTab, setActiveMobileTab] = useState<MobileTab>('chat');
 
@@ -130,7 +130,7 @@ const App: React.FC = () => {
     };
   } | null>(null);
 
-  const { messages: chatMessages, isProcessing, sendMessage: sendChat, setMessages: setChatMessages } = useChat();
+  const { messages: chatMessages, setMessages: setChatMessages } = useChat();
   const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isVoiceModeOpen, setIsVoiceModeOpen] = useState(false);
@@ -474,45 +474,71 @@ const App: React.FC = () => {
   };
 
   // --- Handlers ---
-  const handleSendMessage = async (text: string) => {
-    if (!text.trim()) return;
+  const handleSendMessage = async (content: string) => {
+    if (!content || !content.trim()) return;
 
-    // Build Context
-    const richContext = {
-      language,
-      mode,
-      date: new Date().toISOString(),
-      goals: settings.goals || 'not specified',
-      aiBehavior: settings.aiBehavior || 'calm, strategic, concise',
-      focusItems: focusItems,
-      recentDiary: diaryEntries.slice(0, 5).map(d => ({ type: d.type, title: d.title, content: d.content, date: d.createdAt })),
-      todaysMeetings: meetings.filter(m => {
-        const mDate = new Date(m.startTime);
-        const today = new Date();
-        return mDate.getDate() === today.getDate() && mDate.getMonth() === today.getMonth() && mDate.getFullYear() === today.getFullYear();
-      }).map(m => ({ title: m.title, time: m.startTime, status: m.status })),
-      recentContacts: contacts.slice(0, 10).map(c => ({ name: c.name, role: c.role, company: c.company })),
-      actionLogCount: actionLog.length,
-      userProfile: userProfile,
-      memories: memories.slice(0, 20),
-      dailySummary: dailySummary,
-      weeklySummary: weeklySummary
-    };
+    // Show the user message immediately
+    setChatMessages((prev) => [
+      ...prev,
+      { role: 'user', content, id: crypto.randomUUID(), timestamp: new Date() },
+    ]);
 
-    const actions = await sendChat(text, richContext);
+    setIsProcessing(true);
 
-    // Voice Output Trigger
-    if (settings.voiceOutputEnabled && chatMessages.length > 0) {
-      // We need the last message, but state update might be async. 
-      // Actually sendChat returns actions, but not the text directly in a way we can grab easily without parsing.
-      // But useChat updates state. We can just speak the last message in a useEffect or assume success.
-      // For now, let's rely on the fact that useChat updates state, but we don't have the text here easily.
-      // Wait, useChat returns actions. We can modify useChat to return text too if needed, 
-      // but for now let's just execute actions.
-    }
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            ...chatMessages,
+            { role: 'user', content },
+          ],
+          context: null,      // you can wire your real context later
+          sessionId: null,    // or reuse an existing sessionId if you track it
+        }),
+      });
 
-    if (actions && actions.length > 0) {
-      executePlannerActions(actions);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('API /api/chat error:', errorData);
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: 'Sorry, I had an internal error and could not respond right now.',
+            id: crypto.randomUUID(),
+            timestamp: new Date()
+          },
+        ]);
+        return;
+      }
+
+      const data = await response.json();
+      console.log('API /api/chat response:', data);
+
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: data.reply || '(empty reply)',
+          id: crypto.randomUUID(),
+          timestamp: new Date()
+        },
+      ]);
+    } catch (err) {
+      console.error('handleSendMessage network error:', err);
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: 'Network error talking to the assistant. Please check your connection.',
+          id: crypto.randomUUID(),
+          timestamp: new Date()
+        },
+      ]);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
