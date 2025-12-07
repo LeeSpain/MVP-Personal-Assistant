@@ -58,7 +58,7 @@ export default function InsightsPanel({
         .catch(err => console.error("Failed to generate insights", err))
         .finally(() => setIsLoadingSuggestions(false));
     }
-  }, []);
+  }, [onGenerateInsights, suggestions]);
 
   return (
     <Modal open={true} title={t('insights.title')} onClose={onClose} className="max-w-6xl h-[85vh]">

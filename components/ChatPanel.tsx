@@ -173,7 +173,7 @@ export default function ChatPanel({
       <div className="mt-2 px-2 text-[10px] text-slate-500 text-center shrink-0">
         <span className="opacity-70">Try saying: </span>
         <span className="italic text-slate-400">
-          "{t('chat.hints')[Math.floor(Math.random() * 4)]}"
+          &quot;{t('chat.hints')[Math.floor(Math.random() * 4)]}&quot;
         </span>
       </div>
     </Card>

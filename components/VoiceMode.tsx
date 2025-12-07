@@ -15,7 +15,7 @@ interface VoiceModeProps {
 
 export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, isProcessing }: VoiceModeProps) {
     const { t, language } = useLanguage();
-    const { isListening, transcript, startListening, stopListening } = useSpeechRecognition(language === 'nl' ? 'nl-NL' : 'en-US');
+    const { isListening, transcript, startListening, stopListening, resetTranscript } = useSpeechRecognition(language === 'nl' ? 'nl-NL' : 'en-US');
     const { speak, isSpeaking } = useTextToSpeech();
 
     const [stream, setStream] = useState<MediaStream | null>(null);
@@ -32,7 +32,7 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
         } else if (status === 'speaking' || status === 'listening') {
             setStatus('idle');
         }
-    }, [isListening, isSpeaking]);
+    }, [isListening, isSpeaking, status]);
 
     // 2. Handle Microphone Stream for Visualizer
     useEffect(() => {
@@ -44,14 +44,14 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
             stream.getTracks().forEach(track => track.stop());
             setStream(null);
         }
-    }, [isOpen]);
+    }, [isOpen, stream]);
 
     // 3. Auto-start listening when open (or after speaking)
     useEffect(() => {
         if (isOpen && !isProcessing && status === 'idle' && !isListening && !isSpeaking) {
             startListening();
         }
-    }, [isOpen, isProcessing, status, isListening, isSpeaking]);
+    }, [isOpen, isProcessing, status, isListening, isSpeaking, startListening]);
 
     // 4. Handle Sending Message
     useEffect(() => {
@@ -59,8 +59,9 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
             // Recognition ended and we have text
             setStatus('thinking');
             onSendMessage(transcript);
+            resetTranscript();
         }
-    }, [isListening, transcript]);
+    }, [isListening, transcript, status, onSendMessage, resetTranscript]);
 
     // 5. Handle AI Speaking (TTS)
     useEffect(() => {
@@ -69,7 +70,7 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
             lastMessageIdRef.current = lastMsg.id;
             speak(lastMsg.content, language === 'nl' ? 'nl-NL' : 'en-US');
         }
-    }, [messages]);
+    }, [messages, language, speak]);
 
 
     if (!isOpen) return null;
@@ -93,7 +94,7 @@ export default function VoiceMode({ isOpen, onClose, onSendMessage, messages, is
                 </h2>
                 {transcript && (
                     <p className="text-slate-400 text-lg italic max-w-md mx-auto">
-                        "{transcript}"
+                        &quot;{transcript}&quot;
                     </p>
                 )}
             </div>
