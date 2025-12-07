@@ -1,9 +1,13 @@
 // Local-only chat route: no external AI, no env variables.
-// Uses simple rules and context to generate responses.
+// Smarter rule-based logic using context.
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
+
+// ------------------
+// Types
+// ------------------
 
 type ChatMessage = {
     role: 'user' | 'assistant' | 'system';
@@ -16,6 +20,41 @@ type Meeting = {
     startTime?: string;
     endTime?: string;
 };
+
+type FocusItem = {
+    title?: string;
+    status?: string;
+};
+
+type DiaryEntry = {
+    title?: string;
+    content?: string;
+    createdAt?: string;
+};
+
+type Goal = {
+    title?: string;
+    horizon?: 'today' | 'week' | 'month' | 'year' | string;
+};
+
+// ------------------
+// "System prompt" (behaviour description)
+// ------------------
+
+const BEHAVIOUR_DESCRIPTION = `
+You are a warm, natural personal assistant.
+
+You:
+- Speak in plain text, no markdown.
+- Keep answers short, clear, and friendly.
+- Use any context you are given (meetings, focus items, diary, summaries, goals).
+- Never say "I cannot access your calendar" if meetings are provided in context.
+- If there is no data for something, you say that honestly but helpfully.
+`;
+
+// ------------------
+// Helpers
+// ------------------
 
 function extractText(content: any): string {
     if (typeof content === 'string') return content;
@@ -31,14 +70,14 @@ function getLastUserMessage(messages: ChatMessage[]): string {
     return last ? extractText(last.content).trim() : '';
 }
 
-function summarizeMeetings(meetings: Meeting[]): string {
+function summarizeMeetings(label: string, meetings: Meeting[]): string {
     if (!meetings || meetings.length === 0) {
-        return 'I don’t see any meetings or appointments in your current context.';
+        return `I don’t see any ${label} appointments in your current context.`;
     }
 
     if (meetings.length === 1) {
         const m = meetings[0];
-        return `You have one appointment: ${m.title || 'Untitled'} starting at ${m.startTime || 'an unspecified time'}.`;
+        return `You have one ${label} appointment: ${m.title || 'Untitled'} starting at ${m.startTime || 'an unspecified time'}.`;
     }
 
     const list = meetings
@@ -50,8 +89,94 @@ function summarizeMeetings(meetings: Meeting[]): string {
         })
         .join(' ');
 
-    return `You have ${meetings.length} appointments in your context. Here are the first few: ${list}`;
+    return `You have ${meetings.length} ${label} appointments. Here are a few of them: ${list}`;
 }
+
+function summarizeFocus(focusItems: FocusItem[]): string {
+    if (!focusItems || focusItems.length === 0) {
+        return 'You don’t have any focus items listed in your context yet. If you tell me what you want to work on, I can help you break it down.';
+    }
+
+    const list = focusItems
+        .slice(0, 5)
+        .map((f, i) => {
+            const title = f.title || 'Untitled';
+            const status = f.status || 'no status';
+            return `${i + 1}. ${title} (${status})`;
+        })
+        .join(' ');
+
+    return `Here are some of the things you’re currently focused on: ${list}`;
+}
+
+function summarizeDiary(entries: DiaryEntry[]): string {
+    if (!entries || entries.length === 0) {
+        return 'I don’t see any diary entries in your context yet.';
+    }
+
+    const latest = entries[0];
+    const title = latest.title || 'Untitled entry';
+    const snippet = (latest.content || '').slice(0, 120);
+
+    return `Your most recent diary entry is "${title}". A quick snippet: ${snippet || 'no content available yet.'}`;
+}
+
+function summarizeGoals(goals: Goal[]): string {
+    if (!goals || goals.length === 0) {
+        return 'I don’t see any goals listed in your context yet.';
+    }
+
+    const shortTerm = goals.filter(
+        (g) => g.horizon === 'today' || g.horizon === 'week'
+    );
+
+    const list = (shortTerm.length ? shortTerm : goals)
+        .slice(0, 5)
+        .map((g, i) => `${i + 1}. ${g.title || 'Untitled goal'}`)
+        .join(' ');
+
+    return `Here are some of your goals based on the current context: ${list}`;
+}
+
+function planDayFromContext(
+    todaysMeetings: Meeting[],
+    focusItems: FocusItem[],
+    goals: Goal[]
+): string {
+    const parts: string[] = [];
+
+    if (todaysMeetings && todaysMeetings.length > 0) {
+        const first = todaysMeetings[0];
+        parts.push(
+            `You have a key appointment today: ${first.title || 'Untitled'} at ${first.startTime || 'an unspecified time'
+            }.`
+        );
+    }
+
+    if (focusItems && focusItems.length > 0) {
+        const firstFocus = focusItems[0];
+        parts.push(
+            `A good focus task would be: ${firstFocus.title || 'a main task you’ve set'}, especially to keep momentum.`
+        );
+    }
+
+    if (goals && goals.length > 0) {
+        const aGoal = goals[0];
+        parts.push(
+            `Try to take at least one small step towards this goal today: ${aGoal.title || 'one of your goals'}.`
+        );
+    }
+
+    if (parts.length === 0) {
+        return 'I don’t see anything specific in your context yet. If you tell me what you want your day to look like, I can help you turn it into a simple plan.';
+    }
+
+    return parts.join(' ');
+}
+
+// ------------------
+// Main local brain
+// ------------------
 
 function generateLocalReply(userText: string, rawContext: any): string {
     const context = rawContext && typeof rawContext === 'object' ? rawContext : {};
@@ -59,10 +184,34 @@ function generateLocalReply(userText: string, rawContext: any): string {
     const todaysMeetings: Meeting[] = context.todaysMeetings || [];
     const thisWeeksMeetings: Meeting[] =
         context.thisWeeksMeetings || context.weekMeetings || [];
+    const focusItems: FocusItem[] = context.focusItems || [];
+    const diaryEntries: DiaryEntry[] = context.recentDiary || [];
+    const goals: Goal[] = context.goals || [];
+    const dailySummary: string | null = context.dailySummary || null;
+    const weeklySummary: string | null = context.weeklySummary || null;
 
     const lower = userText.toLowerCase();
 
-    // 1) Appointments / meetings questions
+    // 0) If user says nothing useful
+    if (!userText || userText.trim().length === 0) {
+        return 'I’m here and ready. Tell me what you want to check, plan, or figure out.';
+    }
+
+    // 1) Greetings / small talk
+    if (
+        lower === 'hi' ||
+        lower === 'hello' ||
+        lower.startsWith('hi ') ||
+        lower.startsWith('hello ')
+    ) {
+        return 'Hey, I’m here. Do you want to look at your day, your week, or something else?';
+    }
+
+    if (lower.includes('how are you')) {
+        return 'I’m doing fine and ready to help. What do you want to focus on today?';
+    }
+
+    // 2) Appointments / meetings / schedule
     if (
         lower.includes('appointment') ||
         lower.includes('appointments') ||
@@ -71,37 +220,82 @@ function generateLocalReply(userText: string, rawContext: any): string {
         lower.includes('schedule')
     ) {
         if (lower.includes('today')) {
-            return summarizeMeetings(todaysMeetings);
+            return summarizeMeetings('today', todaysMeetings);
         }
         if (lower.includes('week') || lower.includes('this week')) {
-            return summarizeMeetings(thisWeeksMeetings);
+            return summarizeMeetings('this week', thisWeeksMeetings);
         }
-        // generic schedule question
         const combined = [...todaysMeetings, ...thisWeeksMeetings];
-        return summarizeMeetings(combined);
+        return summarizeMeetings('upcoming', combined);
     }
 
-    // 2) Greetings / small talk
+    // 3) Focus / tasks / goals
     if (
-        lower === 'hi' ||
-        lower === 'hello' ||
-        lower.startsWith('hi ') ||
-        lower.startsWith('hello ')
+        lower.includes('focus') ||
+        lower.includes('task') ||
+        lower.includes('tasks') ||
+        lower.includes('to-do') ||
+        lower.includes('todo') ||
+        lower.includes('goal') ||
+        lower.includes('goals')
     ) {
-        return 'Hey, I’m here. Tell me what you’d like to focus on or ask about.';
+        // If clearly asking about goals
+        if (lower.includes('goal') || lower.includes('goals')) {
+            return summarizeGoals(goals);
+        }
+        return summarizeFocus(focusItems);
     }
 
-    if (lower.includes('how are you')) {
-        return 'I’m doing fine and ready to help. What’s on your mind right now?';
+    // 4) Daily / weekly summaries
+    if (lower.includes('today') && lower.includes('summary')) {
+        if (dailySummary) {
+            return `Here’s your current daily summary from context: ${dailySummary}`;
+        }
+        return 'I don’t see a daily summary in your context yet. If you tell me how your day went, I can help you turn it into one.';
     }
 
-    // 3) Fallback: echo-style but more natural
-    if (userText.length > 0) {
-        return `I’ve got your message: "${userText}". I’m currently running in local test mode without an external AI model, but I can still help you plan, organise, or think through things step by step. What would you like to work on next?`;
+    if (lower.includes('week') && lower.includes('summary')) {
+        if (weeklySummary) {
+            return `Here’s your current weekly summary from context: ${weeklySummary}`;
+        }
+        return 'I don’t see a weekly summary in your context yet. We can create one together if you tell me the main things that happened.';
     }
 
-    return 'I’m here and ready. Tell me what you want to check, plan, or figure out.';
+    // 5) "Plan my day / week" type queries
+    if (
+        (lower.includes('plan') || lower.includes('planning')) &&
+        (lower.includes('day') || lower.includes('today'))
+    ) {
+        return planDayFromContext(todaysMeetings, focusItems, goals);
+    }
+
+    if (
+        (lower.includes('plan') || lower.includes('planning')) &&
+        lower.includes('week')
+    ) {
+        const combined = [...todaysMeetings, ...thisWeeksMeetings];
+        if (combined.length === 0 && goals.length === 0) {
+            return 'I don’t see any meetings or goals in your context for this week yet. If you tell me what you want your week to look like, I can help you sketch out a simple plan.';
+        }
+        return 'For this week, focus on keeping your main meetings in view and picking one or two important tasks or goals each day. If you want, tell me what’s coming up and I’ll help you break it down day by day.';
+    }
+
+    // 6) Diary / reflection questions
+    if (
+        lower.includes('diary') ||
+        lower.includes('journal') ||
+        lower.includes('reflection')
+    ) {
+        return summarizeDiary(diaryEntries);
+    }
+
+    // 7) Generic fallback – but more natural
+    return `Okay, I’ve got your message: "${userText}". Based on the current context I can help you review your schedule, focus items, goals, or recent entries, or we can just think through your plans. What would you like to look at next?`;
 }
+
+// ------------------
+// POST handler
+// ------------------
 
 export async function POST(req: Request) {
     try {
@@ -118,8 +312,12 @@ export async function POST(req: Request) {
         const userText = getLastUserMessage(messages as ChatMessage[]);
         const reply = generateLocalReply(userText, context);
 
+        const finalReply = reply.startsWith('Okay, I’ve got your message:')
+            ? reply
+            : `${reply}`;
+
         return new Response(
-            JSON.stringify({ reply }),
+            JSON.stringify({ reply: finalReply }),
             { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
     } catch (err: any) {
