@@ -44,7 +44,7 @@ export async function POST(req: Request) {
 
         // IMPORTANT: use a valid model name WITHOUT "-latest"
         const geminiResponse = await fetch(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' +
+            'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=' +
             apiKey,
             {
                 method: 'POST',
