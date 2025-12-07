@@ -59,6 +59,7 @@ function buildConversationText(messages: ChatMessage[]): string {
 }
 
 export async function POST(req: Request) {
+    console.log("CHAT ROUTE DEBUG — OPENROUTER_API_KEY:", process.env.OPENROUTER_API_KEY);
     try {
         const body = await req.json();
         const { messages, context } = body || {};
