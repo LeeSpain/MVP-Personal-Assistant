@@ -58,7 +58,7 @@ async function callOpenRouter(messages: ChatMessage[]): Promise<AgentResponse> {
     return { reply };
 }
 
-// ------------- Gemini (optional – but your free quota is exhausted) -------------
+// ------------- Gemini (optional – only if GEMINI_API_KEY is set) -------------
 
 async function callGemini(messages: ChatMessage[]): Promise<AgentResponse> {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -170,12 +170,6 @@ async function callDeepSeek(messages: ChatMessage[]): Promise<AgentResponse> {
 // ------------- Route handler -------------
 
 export async function POST(req: Request) {
-    // Debug line to check if env is loaded
-    console.log(
-        'DEBUG OPENROUTER_API_KEY in /api/chat:',
-        process.env.OPENROUTER_API_KEY
-    );
-
     try {
         const body = await req.json();
         const messages = body.messages as ChatMessage[] | undefined;
