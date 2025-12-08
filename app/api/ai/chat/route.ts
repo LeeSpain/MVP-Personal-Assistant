@@ -4,10 +4,10 @@ import { SYSTEM_PROMPT } from './systemPrompt';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
-      { error: 'GEMINI_API_KEY is not set (route)' },
+      { error: 'OPENROUTER_API_KEY is not set (route)' },
       { status: 500 }
     );
   }
@@ -17,9 +17,8 @@ export async function POST(req: NextRequest) {
     const { message, context, history } = body;
 
     // 1. Construct the Rich Context String
-    // The frontend now sends a JSON object for context. We need to format it for the LLM.
-    let contextString = "";
-    if (typeof context === 'object') {
+    let contextString = '';
+    if (typeof context === 'object' && context !== null) {
       contextString = `
 **CURRENT CONTEXT:**
 - **Date**: ${new Date().toLocaleString()}
@@ -32,11 +31,13 @@ export async function POST(req: NextRequest) {
 - **AI Behavior**: ${context.aiBehavior}
 - **User Profile**: ${JSON.stringify(context.userProfile)}
 - **Memories**: ${JSON.stringify(context.memories)}
-- **Language**: ${context.language === 'nl' ? 'Dutch (Nederlands)' : 'English'}
-- **Daily Summary**: ${context.dailySummary || "None yet"}
-- **Weekly Summary**: ${context.weeklySummary || "None yet"}
+- **Language**: ${context.language === 'nl' ? 'Dutch (Nederlands)' : 'English'
+        }
+- **Daily Summary**: ${context.dailySummary || 'None yet'}
+- **Weekly Summary**: ${context.weeklySummary || 'None yet'}
 
-IMPORTANT: You MUST respond in ${context.language === 'nl' ? 'Dutch (Nederlands)' : 'English'}.
+IMPORTANT: You MUST respond in ${context.language === 'nl' ? 'Dutch (Nederlands)' : 'English'
+        }.
       `;
     } else {
       contextString = `Context: ${context}`;
@@ -45,79 +46,95 @@ IMPORTANT: You MUST respond in ${context.language === 'nl' ? 'Dutch (Nederlands)
     // 2. Build the System Instruction
     const fullSystemInstruction = `${SYSTEM_PROMPT}\n\n${contextString}`;
 
-    // 3. Construct Contents (Alternating Turns)
-    // Ensure history alternates. If we have User -> User, we must merge or drop.
-    // For simplicity, we'll assume the client sends valid history, but we'll append the current message.
+    // 3. Build messages array for OpenRouter (system + history + current user)
+    const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] =
+      [];
 
-    const contents = [
-      ...history.map((msg: any) => ({
-        role: msg.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: msg.content }]
-      })),
-      {
-        role: "user",
-        parts: [{ text: message }]
+    messages.push({
+      role: 'system',
+      content: fullSystemInstruction,
+    });
+
+    if (Array.isArray(history)) {
+      for (const msg of history) {
+        // history comes as { role: 'user' | 'assistant', content: string }
+        const role =
+          msg.role === 'assistant'
+            ? 'assistant'
+            : 'user'; // normalize anything else to 'user'
+        messages.push({
+          role,
+          content: msg.content,
+        });
       }
-    ];
+    }
 
-    // 4. Call Gemini API with JSON Mode & System Instruction
+    messages.push({
+      role: 'user',
+      content: message,
+    });
+
+    // 4. Call OpenRouter (DeepSeek by default) and ask for JSON output
+    const model =
+      process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat';
+
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      'https://openrouter.ai/api/v1/chat/completions',
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+          'HTTP-Referer': 'http://localhost:3000',
+          'X-Title': 'MVP Personal Assistant – Planner',
         },
         body: JSON.stringify({
-          systemInstruction: {
-            parts: [{ text: fullSystemInstruction }]
-          },
-          contents: contents,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 4000,
-            responseMimeType: "application/json"
-          }
-        })
+          model,
+          messages,
+        }),
       }
     );
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Gemini API Error:", errorData);
+      const errorData = await response.json().catch(() => null);
+      console.error('OpenRouter API Error:', errorData || (await response.text()));
       return NextResponse.json(
-        { error: errorData.error?.message || 'Failed to fetch from Gemini' },
+        {
+          error:
+            errorData?.error?.message ||
+            'Failed to fetch from OpenRouter (planner route)',
+        },
         { status: response.status }
       );
     }
 
     const data = await response.json();
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const rawText: string | undefined =
+      data.choices?.[0]?.message?.content || '';
 
     if (!rawText) {
-      throw new Error("No content generated");
+      throw new Error('No content generated');
     }
 
-    // 4. Parse the JSON Response
-    let parsedResponse;
+    // 5. Parse the JSON Response
+    let parsedResponse: any;
     try {
       parsedResponse = JSON.parse(rawText);
     } catch (e) {
-      console.error("Failed to parse JSON response:", rawText);
-      // Fallback if model fails to return valid JSON
+      console.error('Failed to parse JSON response from model:', rawText);
+      // Fallback if the model doesn't return valid JSON
       return NextResponse.json({
-        reply: rawText, // Return raw text as reply
-        actions: []
+        reply: rawText,
+        actions: [],
       });
     }
 
     return NextResponse.json({
-      reply: parsedResponse.reply || "I processed that, but have no specific reply.",
-      actions: parsedResponse.actions || []
+      reply: parsedResponse.reply || 'I processed that, but have no specific reply.',
+      actions: parsedResponse.actions || [],
     });
-
   } catch (error: any) {
-    console.error("API Route Error:", error);
+    console.error('API Route Error (planner):', error);
     return NextResponse.json(
       { error: error.message || 'Internal Server Error' },
       { status: 500 }
