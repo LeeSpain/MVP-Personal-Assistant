@@ -1,5 +1,5 @@
 // app/api/chat/route.ts
-// Unified chat endpoint that can use Gemini, OpenAI, or DeepSeek.
+// Unified chat endpoint that can use OpenRouter (default), Gemini, OpenAI, or DeepSeek.
 // Frontend (App.tsx, VoiceMode, etc.) calls this with { messages: [...] }.
 
 import { NextResponse } from 'next/server';
@@ -18,7 +18,47 @@ interface AgentResponse {
     actions?: any[];
 }
 
-// ------------- Provider clients -------------
+// ------------- OpenRouter (DEFAULT) -------------
+
+async function callOpenRouter(messages: ChatMessage[]): Promise<AgentResponse> {
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
+        throw new Error('OPENROUTER_API_KEY is not set');
+    }
+
+    // Default model via OpenRouter – you can change this string later if you want.
+    const model = process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat';
+
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+            // These headers are recommended by OpenRouter (can be anything identifying your app)
+            'HTTP-Referer': 'http://localhost:3000',
+            'X-Title': 'MVP Personal Assistant',
+        },
+        body: JSON.stringify({
+            model,
+            messages: messages.map((m) => ({
+                role: m.role,
+                content: m.content,
+            })),
+        }),
+    });
+
+    if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`OpenRouter error: ${errorText}`);
+    }
+
+    const data = await res.json();
+    const reply =
+        data.choices?.[0]?.message?.content || '(no reply from OpenRouter)';
+    return { reply };
+}
+
+// ------------- Gemini (optional – but your free quota is exhausted) -------------
 
 async function callGemini(messages: ChatMessage[]): Promise<AgentResponse> {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -26,13 +66,10 @@ async function callGemini(messages: ChatMessage[]): Promise<AgentResponse> {
         throw new Error('GEMINI_API_KEY is not set');
     }
 
-    // Join all messages into a single prompt
     const prompt = messages
         .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
         .join('\n');
 
-    // IMPORTANT: use a model that actually exists for v1beta with your key.
-    // Use gemini-2.0-flash (current recommended general model).
     const url =
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' +
         apiKey;
@@ -61,6 +98,8 @@ async function callGemini(messages: ChatMessage[]): Promise<AgentResponse> {
         '(no reply from Gemini)';
     return { reply };
 }
+
+// ------------- Direct OpenAI (only if you add OPENAI_API_KEY) -------------
 
 async function callOpenAI(messages: ChatMessage[]): Promise<AgentResponse> {
     const apiKey = process.env.OPENAI_API_KEY;
@@ -93,6 +132,8 @@ async function callOpenAI(messages: ChatMessage[]): Promise<AgentResponse> {
         data.choices?.[0]?.message?.content || '(no reply from OpenAI)';
     return { reply };
 }
+
+// ------------- Direct DeepSeek (only if you add DEEPSEEK_API_KEY) -------------
 
 async function callDeepSeek(messages: ChatMessage[]): Promise<AgentResponse> {
     const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -141,22 +182,25 @@ export async function POST(req: Request) {
             );
         }
 
-        // Choose provider: body.provider overrides env, env defaults to "gemini"
-        const envProvider = process.env.LLM_PROVIDER || 'gemini';
+        // Choose provider: body.provider overrides env, env defaults to "openrouter"
+        const envProvider = process.env.LLM_PROVIDER || 'openrouter';
         const provider = (bodyProvider || envProvider).toLowerCase();
 
         let agentResponse: AgentResponse;
 
         switch (provider) {
+            case 'gemini':
+                agentResponse = await callGemini(messages);
+                break;
             case 'openai':
                 agentResponse = await callOpenAI(messages);
                 break;
             case 'deepseek':
                 agentResponse = await callDeepSeek(messages);
                 break;
-            case 'gemini':
+            case 'openrouter':
             default:
-                agentResponse = await callGemini(messages);
+                agentResponse = await callOpenRouter(messages);
                 break;
         }
 
