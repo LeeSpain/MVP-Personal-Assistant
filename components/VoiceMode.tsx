@@ -173,7 +173,7 @@ export default function VoiceMode({
 
     return (
         <div className="fixed inset-0 bg-slate-950 z-[100] flex flex-col items-center justify-center p-6">
-            {/* Close Button */}
+            {/* Close Button (top-right X) */}
             <button
                 onClick={handleClose}
                 className="absolute top-6 right-6 text-slate-400 hover:text-white z-[110] p-2 hover:bg-slate-800 rounded-full transition-colors"
@@ -277,8 +277,16 @@ export default function VoiceMode({
                 )}
             </div>
 
+            {/* Big Back-to-messaging button */}
+            <button
+                onClick={handleClose}
+                className="mt-4 mb-4 px-6 py-3 rounded-full bg-slate-800 text-slate-100 hover:bg-slate-700 text-sm font-semibold tracking-wide z-[110]"
+            >
+                ← Back to messaging
+            </button>
+
             {/* Controls */}
-            <div className="mt-8 flex gap-6 z-[110]">
+            <div className="mt-2 flex gap-6 z-[110]">
                 {/* Mute Button */}
                 <button
                     onClick={toggleMute}
