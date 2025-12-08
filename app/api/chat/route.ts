@@ -170,6 +170,12 @@ async function callDeepSeek(messages: ChatMessage[]): Promise<AgentResponse> {
 // ------------- Route handler -------------
 
 export async function POST(req: Request) {
+    // Debug line to check if env is loaded
+    console.log(
+        'DEBUG OPENROUTER_API_KEY in /api/chat:',
+        process.env.OPENROUTER_API_KEY
+    );
+
     try {
         const body = await req.json();
         const messages = body.messages as ChatMessage[] | undefined;
