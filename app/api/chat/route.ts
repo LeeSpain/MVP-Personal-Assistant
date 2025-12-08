@@ -26,27 +26,29 @@ async function callGemini(messages: ChatMessage[]): Promise<AgentResponse> {
         throw new Error('GEMINI_API_KEY is not set');
     }
 
-    // Simple strategy: join all messages into one prompt
+    // Join all messages into a single prompt
     const prompt = messages
         .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
         .join('\n');
 
-    const res = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' +
-        apiKey,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [
-                    {
-                        role: 'user',
-                        parts: [{ text: prompt }],
-                    },
-                ],
-            }),
-        }
-    );
+    // IMPORTANT: use a model that actually exists for v1beta with your key.
+    // Use gemini-2.0-flash (current recommended general model).
+    const url =
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' +
+        apiKey;
+
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            contents: [
+                {
+                    role: 'user',
+                    parts: [{ text: prompt }],
+                },
+            ],
+        }),
+    });
 
     if (!res.ok) {
         const errorText = await res.text();
