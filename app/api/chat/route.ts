@@ -1,8 +1,10 @@
 // app/api/chat/route.ts
 // Unified chat endpoint that can use Gemini, OpenAI, or DeepSeek.
-// Frontend: App.tsx -> handleSendMessage() sends { messages: [...] } here.
+// Frontend (App.tsx, VoiceMode, etc.) calls this with { messages: [...] }.
 
 import { NextResponse } from 'next/server';
+
+export const dynamic = 'force-dynamic';
 
 type Role = 'user' | 'assistant' | 'system';
 
@@ -15,9 +17,6 @@ interface AgentResponse {
     reply: string;
     actions?: any[];
 }
-
-// Allow dynamic on Vercel / Next
-export const dynamic = 'force-dynamic';
 
 // ------------- Provider clients -------------
 
@@ -140,7 +139,7 @@ export async function POST(req: Request) {
             );
         }
 
-        // Choose provider: body.provider overrides env, env defaults to gemini
+        // Choose provider: body.provider overrides env, env defaults to "gemini"
         const envProvider = process.env.LLM_PROVIDER || 'gemini';
         const provider = (bodyProvider || envProvider).toLowerCase();
 
