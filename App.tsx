@@ -850,7 +850,7 @@ const App: React.FC = () => {
               voiceInputEnabled={settings.voiceInputEnabled}
               voiceOutputEnabled={settings.voiceOutputEnabled}
               onToggleVoiceOutput={() => setSettings(prev => ({ ...prev, voiceOutputEnabled: !prev.voiceOutputEnabled }))}
-              onOpenVoiceMode={() => setIsVoiceModeOpen(true)}
+              onOpenVoiceMode={() => setIsVoiceModeOpen(true)} // Opens voice mode overlay
               isProcessing={isProcessing}
             />
             {isProcessing && (
