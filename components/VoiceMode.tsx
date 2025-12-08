@@ -18,7 +18,7 @@ export default function VoiceMode({
     onClose,
     onSendMessage,
     messages,
-    isProcessing
+    isProcessing,
 }: VoiceModeProps) {
     const { t, language } = useLanguage();
     const {
@@ -26,7 +26,7 @@ export default function VoiceMode({
         transcript,
         startListening,
         stopListening,
-        resetTranscript
+        resetTranscript,
     } = useSpeechRecognition(language === 'nl' ? 'nl-NL' : 'en-US');
     const { speak, isSpeaking } = useTextToSpeech();
 
@@ -50,7 +50,7 @@ export default function VoiceMode({
 
         // Stop microphone stream
         if (stream) {
-            stream.getTracks().forEach(track => track.stop());
+            stream.getTracks().forEach((track) => track.stop());
             setStream(null);
         }
 
@@ -79,10 +79,10 @@ export default function VoiceMode({
         if (isOpen && !stream) {
             navigator.mediaDevices
                 .getUserMedia({ audio: true })
-                .then(s => setStream(s))
-                .catch(e => console.error('Mic access denied', e));
+                .then((s) => setStream(s))
+                .catch((e) => console.error('Mic access denied', e));
         } else if (!isOpen && stream) {
-            stream.getTracks().forEach(track => track.stop());
+            stream.getTracks().forEach((track) => track.stop());
             setStream(null);
             setIsMuted(false); // Reset mute state on close
             setView('visualizer'); // Reset view on close
@@ -108,7 +108,7 @@ export default function VoiceMode({
         isListening,
         isSpeaking,
         startListening,
-        isMuted
+        isMuted,
     ]);
 
     // 4. Handle Sending Message
@@ -149,13 +149,16 @@ export default function VoiceMode({
 
     const toggleMute = () => {
         console.log('Toggle mute clicked');
+        // Always toggle UI state so you SEE it change
+        setIsMuted((prev) => !prev);
+
+        // If we have a real audio track, also toggle that
         if (stream) {
             const audioTrack = stream.getAudioTracks()[0];
             if (audioTrack) {
                 audioTrack.enabled = !audioTrack.enabled;
                 const nowMuted = !audioTrack.enabled;
-                setIsMuted(nowMuted);
-                console.log('Mute toggled. New state:', nowMuted);
+                console.log('Microphone track toggled. Muted:', nowMuted);
 
                 // If we are muting, stop listening to avoid partial transcripts
                 if (nowMuted) {
@@ -165,7 +168,16 @@ export default function VoiceMode({
                 }
             }
         } else {
-            console.warn('No stream to mute');
+            console.warn('No stream to mute (UI still toggled)');
+        }
+    };
+
+    const handleListeningToggle = () => {
+        console.log('Listening toggle clicked');
+        if (isListening) {
+            stopListening();
+        } else {
+            startListening();
         }
     };
 
@@ -234,11 +246,7 @@ export default function VoiceMode({
                             <AudioVisualizer
                                 stream={stream}
                                 isActive={!isMuted}
-                                color={
-                                    status === 'speaking'
-                                        ? '#34d399'
-                                        : '#8b5cf6'
-                                } // Green for AI, Violet for User
+                                color={status === 'speaking' ? '#34d399' : '#8b5cf6'} // Green for AI, Violet for User
                             />
                         </div>
                     </>
@@ -246,12 +254,10 @@ export default function VoiceMode({
                     /* Chat View */
                     <div className="w-full h-[60vh] bg-slate-900/50 rounded-2xl border border-slate-800 p-4 overflow-y-auto custom-scrollbar relative z-[110]">
                         <div className="space-y-4">
-                            {messages.map(m => (
+                            {messages.map((m) => (
                                 <div
                                     key={m.id}
-                                    className={`flex ${m.role === 'user'
-                                            ? 'justify-end'
-                                            : 'justify-start'
+                                    className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'
                                         }`}
                                 >
                                     <div
@@ -331,11 +337,7 @@ export default function VoiceMode({
 
                 {/* Listening Toggle */}
                 <button
-                    onClick={() => {
-                        console.log('Listening toggle clicked');
-                        if (isListening) stopListening();
-                        else startListening();
-                    }}
+                    onClick={handleListeningToggle}
                     className={`p-4 rounded-full transition-all shadow-lg ${isListening
                             ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
                             : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
