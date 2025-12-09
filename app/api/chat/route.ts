@@ -27,7 +27,8 @@ async function callOpenRouter(messages: ChatMessage[]): Promise<AgentResponse> {
     }
 
     // Default model via OpenRouter – you can change this string later if you want.
-    const model = process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat';
+    const DEFAULT_MODEL = 'deepseek/deepseek-chat';
+    const model = process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
 
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
@@ -107,6 +108,8 @@ async function callOpenAI(messages: ChatMessage[]): Promise<AgentResponse> {
         throw new Error('OPENAI_API_KEY is not set');
     }
 
+    const OPENAI_MODEL = 'gpt-4o-mini';
+
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -114,7 +117,7 @@ async function callOpenAI(messages: ChatMessage[]): Promise<AgentResponse> {
             Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-            model: 'gpt-4o-mini', // cheaper model for testing
+            model: OPENAI_MODEL, // cheaper model for testing
             messages: messages.map((m) => ({
                 role: m.role,
                 content: m.content,
@@ -141,6 +144,8 @@ async function callDeepSeek(messages: ChatMessage[]): Promise<AgentResponse> {
         throw new Error('DEEPSEEK_API_KEY is not set');
     }
 
+    const DEEPSEEK_MODEL = 'deepseek-chat';
+
     const res = await fetch('https://api.deepseek.com/chat/completions', {
         method: 'POST',
         headers: {
@@ -148,7 +153,7 @@ async function callDeepSeek(messages: ChatMessage[]): Promise<AgentResponse> {
             Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-            model: 'deepseek-chat',
+            model: DEEPSEEK_MODEL,
             messages: messages.map((m) => ({
                 role: m.role,
                 content: m.content,

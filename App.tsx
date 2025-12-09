@@ -170,7 +170,7 @@ const App: React.FC = () => {
 
           // Migration: Check if integrations is an array (new format). If not (old object format), use default.
           if (parsedSettings.integrations && !Array.isArray(parsedSettings.integrations)) {
-            console.warn("Migrating legacy integrations settings...");
+            // console.warn("Migrating legacy integrations settings...");
             parsedSettings.integrations = DEFAULT_SETTINGS.integrations;
           }
 
@@ -204,7 +204,7 @@ const App: React.FC = () => {
             localStorage.setItem('mvb_chat_history', JSON.stringify(newHistory));
 
             // Clear active chat (it's already reset by default state, so just don't load it)
-            console.log("Archived previous session to history.");
+            // console.log("Archived previous session to history.");
           } else {
             // If it was empty/short, maybe we restore it? 
             // User requested "refresh = clear", so we should probably NOT restore it even if short,
@@ -299,7 +299,7 @@ const App: React.FC = () => {
     actions.forEach(action => {
       // 1. Strict Contract Enforcement
       if (!validateAction(action)) {
-        console.warn(`Invalid action proposed: ${action.type}`, action);
+        // console.warn(`Invalid action proposed: ${action.type}`, action);
         setNotifications(prev => [{
           id: crypto.randomUUID(),
           message: t('notifications.invalidAction', { type: action.type }),
@@ -321,7 +321,7 @@ const App: React.FC = () => {
 
         case ActionType.CREATE_MEETING:
           if (!settings.autoCreateMeetings) {
-            console.log("Auto-create disabled, but action received.");
+            // console.log("Auto-create disabled, but action received.");
           }
           const meetingStart = action.payload.startTime
             ? new Date(action.payload.startTime)

@@ -7,18 +7,31 @@ interface ModalProps {
     title: string;
     onClose: () => void;
     children: ReactNode;
+    className?: string; // ✅ ADD THIS
 }
 
-export default function Modal({ open, title, onClose, children, className = "max-w-2xl" }: ModalProps & { className?: string }) {
+export default function Modal({
+    open,
+    title,
+    onClose,
+    children,
+    className = "max-w-2xl"
+}: ModalProps) {
     if (!open) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-black/70 backdrop-blur-sm"
                 onClick={onClose}
             />
-            <div className={`relative z-50 w-full ${className} rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl shadow-black/60 flex flex-col max-h-[90vh]`}>
+
+            {/* Modal container */}
+            <div
+                className={`relative z-50 w-full ${className} rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl shadow-black/60 flex flex-col max-h-[90vh]`}
+            >
+                {/* Header */}
                 <div className="mb-4 flex items-center justify-between border-b border-slate-800 pb-4 shrink-0">
                     <h2 className="text-sm font-semibold tracking-wide text-slate-100">
                         {title}
@@ -31,6 +44,7 @@ export default function Modal({ open, title, onClose, children, className = "max
                     </button>
                 </div>
 
+                {/* Body */}
                 <div className="overflow-y-auto min-h-0 text-sm text-slate-200">
                     {children}
                 </div>
